@@ -1,0 +1,60 @@
+[build-system]
+requires = [ "hatchling>=1.24.2",]
+build-backend = "hatchling.build"
+
+[project]
+name = "pycypher"
+version = "0.0.19"
+description = "Cypher parser and query executor for Python"
+readme = "README.md"
+requires-python = "==3.14.*"
+keywords = [ "neo4j", "cypher",]
+classifiers = [ "Development Status :: 3 - Alpha", "Intended Audience :: Developers", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3.14",]
+dependencies = [
+    "shared",
+    "pydantic>=2.13.4,<3.0.0",
+    "lark>=1.3.1,<2.0.0",
+    "pandas>=3.0.0,<4.0.0",
+    "pyarrow>=18.0.0,<25.0.0",
+    "duckdb>=1.5.2,<2.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
+    "click>=8.3.3,<9.0.0",
+    "numpy>=2.0.0,<3.0.0",
+]
+
+[[project.authors]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[[project.maintainers]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[project.license]
+file = "LICENSE.txt"
+
+[project.optional-dependencies]
+neo4j = [ "neo4j>=5.0.0,<7.0.0",]
+large-dataset = [
+    "dask[dataframe]>=2025.1.0,<2027.0.0",
+    "distributed>=2025.1.0,<2027.0.0",
+]
+storage = [
+    "deltalake>=0.18.0,<2.0.0",
+]
+cloud = [
+    "s3fs>=2025.1.0,<2027.0.0",
+    "gcsfs>=2025.1.0,<2027.0.0",
+]
+polars = [
+    "polars>=1.0.0,<2.0.0",
+]
+all = [
+    "pycypher[large-dataset,storage,cloud,neo4j,polars]",
+]
+
+[project.urls]
+Homepage = "https://github.com/zacernst/pycypher"
+
+[project.scripts]
+nmetl = "pycypher.nmetl_cli:main"

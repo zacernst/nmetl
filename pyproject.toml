@@ -1,0 +1,647 @@
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+pycypher = { workspace = true }
+shared = { workspace = true }
+pycypher-tui = { workspace = true }
+
+[tool.uv]
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
+# Security: enforce minimum patched versions for known vulnerabilities.
+# These override transitive-dependency resolutions without changing the
+# packages that directly depend on them.
+constraint-dependencies = [
+  "msgpack>=1.2.1",   # GHSA-6v7p-g79w-8964 (DoS / SEGV via repeated unpack after error)
+  "starlette>=1.3.1", # CVE-2026-54282 (URL path injection), CVE-2026-54283 (form limit bypass)
+  "tornado>=6.5.7",   # CVE-2026-49853/54/55 (websocket mask OOB, redirect credential leak, gzip DoS), GHSA-pw6j-qg29-8w7f
+  "pip>=26.1.2",      # PYSEC-2026-196 (console_scripts path traversal)
+  # Nothing in this repo imports these two; they were previously listed as
+  # direct dependencies of pycypher-workspace purely to raise the floor on a
+  # transitive resolution, which is what constraint-dependencies is for.
+  "cryptography>=50.0.0",
+  "gitpython>=3.1.59",
+]
+
+
+[project]
+name = "pycypher-workspace"
+version = "0.0.1"
+description = "PyCypher monorepo workspace"
+readme = "README.md"
+requires-python = "==3.14.*"
+keywords = ["neo4j", "cypher", "parser", "relational algebra"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  # Only 3.14 — requires-python is "==3.14.*", so advertising 3.12/3.13 here
+  # promised installs that pip/uv would reject.
+  "Programming Language :: Python :: 3.14",
+]
+
+dependencies = ["pycypher", "shared", "pycypher-tui"]
+
+[[project.authors]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[[project.maintainers]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[project.license]
+file = "LICENSE.txt"
+
+[project.urls]
+Homepage = "https://github.com/zacernst/pycypher"
+Documentation = "https://zacernst.github.io/pycypher/"
+
+[tool.pylint.main]
+disable = ["line-too-long", "trailing-whitespace", "missing-docstring"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+exclude = [".claude/worktrees/**"]
+
+[tool.ty.rules]
+# Temporarily ignored — mostly test-signature drift from API refactors.
+# Remove these as type errors are fixed (tracked by Andy's type-fix tasks).
+unknown-argument = "ignore"              # 67 hits: tests passing removed kwargs
+too-many-positional-arguments = "ignore" # 34 hits: paired with above
+unresolved-import = "warn"               # pyroscope etc. are optional deps
+
+unresolved-attribute = "warn"  # 97 diagnostics, ~50% tooling gaps
+invalid-argument-type = "warn" # 38 diagnostics, ~50% tooling gaps
+not-subscriptable = "warn"     # 11 diagnostics, single Series|None root cause
+no-matching-overload = "warn"  # 5 diagnostics, numpy/dict stub limits
+invalid-assignment = "warn"    # 3 diagnostics, optional-dep fallbacks
+
+[tool.ruff]
+line-length = 79
+indent-width = 4
+# Matches requires-python = "==3.14.*". Note that bare "314" is invalid —
+# ruff requires the py3XX form and aborts the TOML parse otherwise.
+#
+# This was "py312", justified in a comment as working around a ruff formatter
+# "bug" that strips the parens from `except (A, B):`. That is not a bug: it is
+# PEP 758, which makes unparenthesized except groups valid in 3.14, and the
+# formatter only applies it when target-version says 3.14. Since every package
+# here requires ==3.14.*, the rewrite is correct and the workaround was not.
+#
+target-version = "py314"
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+  "raw_data",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # Formatter-incompatible rules (ruff docs recommend disabling when using ruff format)
+  "COM812", # missing-trailing-comma — handled by formatter
+  # Test-suite noise — assert is idiomatic in pytest
+  "S101", # assert — 13K+ hits, all in tests
+  # Docstring rules that conflict with each other
+  "D203",   # incorrect-blank-line-before-class — conflicts with D211
+  "D213",   # multi-line-summary-second-line — conflicts with D212
+  "CPY001", # missing-copyright-notice
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: relax docstrings, type annotations, magic values, line length, etc.
+"tests/**/*.py" = [
+  "ANN",     # type annotations not required in tests
+  "D",       # docstrings not required in tests
+  "PLR2004", # magic value comparisons are normal in tests
+  "SLF001",  # accessing private members is normal in tests
+  "INP001",  # implicit namespace packages (test directories)
+  "PLC0415", # imports inside functions are common in tests
+  "ARG002",  # unused method arguments (fixtures, parametrize)
+  "E712",    # true-false comparison (pandas idx filtering in tests)
+  "T201",    # print statements ok in tests
+  "ERA001",  # commented-out code ok in tests
+  "B905",    # zip-without-explicit-strict ok in tests
+  "FBT003",  # boolean positional values ok in tests
+  "PT011",   # pytest-raises-too-broad ok in tests
+  "B017",    # assert-raises-exception ok in tests
+  "RUF002",  # ambiguous unicode ok in test docstrings
+  "RUF001",  # ambiguous unicode ok in test strings
+  "E501",    # line length relaxed in tests (long assertions)
+]
+# Standalone scripts, demos, examples: relax annotations and docstrings
+"scripts/**/*.py" = ["ANN", "D", "INP001", "T201"]
+"examples/**/*.py" = ["ANN", "D", "INP001", "T201"]
+"demos/**/*.py" = ["ANN", "D", "INP001", "T201", "ERA001"]
+"demo_*.py" = ["ANN", "D", "INP001", "T201"]
+# ---------------------------------------------------------------------------
+# Grandfathered backlog.
+#
+# Until this commit every package carried its own [tool.ruff] table. ruff does
+# not merge configs across a workspace -- the nearest table wins outright -- so
+# `select = ["ALL"]` below never applied to packages/ at all. pycypher was
+# being linted with 415 rules instead of 810; `ruff check packages/pycypher`
+# reported 150 findings where the root config finds 3336.
+#
+# Removing those tables is the fix, but it exposes ~11k pre-existing findings.
+# They are grandfathered by rule code rather than left failing because the
+# blocking CI check (scripts/lint_changed.sh) lints whole changed files, so
+# without this every PR touching packages/ would fail on untouched code.
+#
+# This is a burn-down list, not a policy. Delete codes as they are fixed. Rule
+# categories absent from a list are NOT grandfathered, so new code is still
+# held to the full `ALL` ruleset.
+# ---------------------------------------------------------------------------
+# NB: RUF100 appears in this list and in packages/*/tests because
+# grandfathering SLF001/F401 makes the existing `# noqa: SLF001` comments in
+# those files read as unused. Drop RUF100 and the stale noqa comments together
+# with the rule they guard.
+#
+# 1213 pre-existing violations, 81 rules
+# 1005 pre-existing violations, 67 rules
+"packages/pycypher-tui/src/**/*.py" = [
+  "A002",
+  "ANN001",
+  "ANN003",
+  "ANN201",
+  "ANN202",
+  "ANN204",
+  "ANN401",
+  "ARG001",
+  "ARG002",
+  "B905",
+  "BLE001",
+  "C901",
+  "D102",
+  "D107",
+  "D301",
+  "D401",
+  "D413",
+  "E402",
+  "E501",
+  "EM102",
+  "ERA001",
+  "F401",
+  "F541",
+  "F811",
+  "F821",
+  "F841",
+  "FBT001",
+  "FBT002",
+  "FBT003",
+  "FURB110",
+  "ISC004",
+  "PERF401",
+  "PIE810",
+  "PLC0415",
+  "PLR0911",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+  "PLR1714",
+  "PLR2004",
+  "PLR5501",
+  "PTH105",
+  "PTH108",
+  "PTH110",
+  "RET505",
+  "RUF005",
+  "RUF012",
+  "RUF019",
+  "RUF022",
+  "RUF100",
+  "S110",
+  "SIM102",
+  "SIM103",
+  "SIM110",
+  "SIM117",
+  "SIM118",
+  "SLF001",
+  "T201",
+  "TC001",
+  "TC002",
+  "TRY003",
+  "TRY300",
+  "TRY301",
+  "TRY401",
+  "UP035",
+  "UP037",
+  "UP046",
+]
+# 3336 pre-existing violations, 111 rules
+"packages/pycypher/src/**/*.py" = [
+  "A002",
+  "ANN001",
+  "ANN201",
+  "ANN202",
+  "ANN205",
+  "ANN401",
+  "ARG001",
+  "ARG002",
+  "ARG003",
+  "ARG004",
+  "B007",
+  "B023",
+  "B904",
+  "B905",
+  "BLE001",
+  "C401",
+  "C416",
+  "C901",
+  "D102",
+  "D105",
+  "D107",
+  "D205",
+  "D301",
+  "D400",
+  "D401",
+  "D407",
+  "D412",
+  "D413",
+  "D417",
+  "DTZ001",
+  "DTZ005",
+  "DTZ011",
+  "E402",
+  "E501",
+  "E721",
+  "EM101",
+  "EM102",
+  "ERA001",
+  "F401",
+  "F841",
+  "FBT001",
+  "FBT002",
+  "FBT003",
+  "FURB110",
+  "FURB168",
+  "FURB171",
+  "I001",
+  "ICN001",
+  "N802",
+  "N806",
+  "N811",
+  "N814",
+  "PD009",
+  "PD011",
+  "PERF401",
+  "PERF403",
+  "PLC0207",
+  "PLC0414",
+  "PLC0415",
+  "PLR0124",
+  "PLR0911",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+  "PLR0917",
+  "PLR1714",
+  "PLR1716",
+  "PLR2004",
+  "PLR5501",
+  "PLW0108",
+  "PLW0603",
+  "PLW2901",
+  "PTH103",
+  "PTH107",
+  "PTH123",
+  "PTH204",
+  "PTH207",
+  "PYI034",
+  "PYI063",
+  "RET504",
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  "RUF005",
+  "RUF012",
+  "RUF022",
+  "RUF023",
+  "RUF036",
+  "RUF059",
+  "RUF100",
+  "S105",
+  "S110",
+  "S608",
+  "SIM101",
+  "SIM102",
+  "SIM103",
+  "SIM105",
+  "SIM108",
+  "SIM114",
+  "SLF001",
+  "T201",
+  "TC001",
+  "TC002",
+  "TC003",
+  "TC005",
+  "TC006",
+  "TRY003",
+  "TRY300",
+  "TRY301",
+  "UP006",
+  "UP035",
+]
+# 127 pre-existing violations, 25 rules
+"packages/shared/src/**/*.py" = [
+  "ANN401",
+  "ARG002",
+  "C901",
+  "D102",
+  "D107",
+  "D401",
+  "D413",
+  "E501",
+  "FBT001",
+  "FBT002",
+  "N806",
+  "PERF401",
+  "PLC0415",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+  "PLR2004",
+  "PYI034",
+  "PYI041",
+  "RUF002",
+  "RUF022",
+  "SIM105",
+  "SLF001",
+  "TRY004",
+  "UP045",
+]
+# 45 pre-existing violations, 6 rules
+"packages/*/*.py" = ["ANN201", "BLE001", "E501", "PLC0415", "S108", "T201"]
+# 30 pre-existing violations, 7 rules
+"packages/*/benchmarks/**/*.py" = [
+  "BLE001",
+  "D103",
+  "E501",
+  "INP001",
+  "ISC004",
+  "PLR0124",
+  "T201",
+]
+# 8 pre-existing violations, 7 rules
+"packages/*/docs/**/*.py" = [
+  "A001",
+  "ARG001",
+  "D100",
+  "E501",
+  "INP001",
+  "PLC0415",
+  "PTH100",
+]
+# 5402 pre-existing violations, 62 rules
+# NB: RUF100 is listed here because grandfathering SLF001/F401 below
+# makes the existing `# noqa: SLF001` comments in these files read as
+# unused. Drop RUF100 and the stale noqa comments together with the
+# rule they guard.
+"packages/*/tests/**/*.py" = [
+  "ANN001",
+  "ANN002",
+  "ANN003",
+  "ANN201",
+  "ANN202",
+  "ANN204",
+  "ANN401",
+  "ARG001",
+  "ARG002",
+  "ARG005",
+  "B007",
+  "B009",
+  "B905",
+  "BLE001",
+  "C408",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D107",
+  "D205",
+  "D301",
+  "D400",
+  "D401",
+  "D403",
+  "D415",
+  "E402",
+  "E501",
+  "E741",
+  "EM102",
+  "ERA001",
+  "F401",
+  "F841",
+  "FBT003",
+  "I001",
+  "N802",
+  "PD011",
+  "PERF401",
+  "PLC0415",
+  "PLR0913",
+  "PLR2004",
+  "PLW0108",
+  "PT018",
+  "PTH123",
+  "RET505",
+  "RUF002",
+  "RUF005",
+  "RUF012",
+  "RUF015",
+  "RUF043",
+  "RUF059",
+  "S105",
+  "S106",
+  "S108",
+  "S110",
+  "S603",
+  "S607",
+  "SIM105",
+  "SLF001",
+  "TC002",
+  "TC003",
+  "TRY003",
+  "RUF100",
+]
+
+[tool.coverage.run]
+source = [
+  "packages/pycypher/src/pycypher",
+  "packages/shared/src/shared",
+  "packages/pycypher-tui/src/pycypher_tui",
+]
+omit = ["*/.local/*", "*/filter_us_nodes.py"]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_also = [
+  "def tree",
+  "def print_tree",
+  "def __repr__",
+  "if self.debug:",
+  "if settings.DEBUG",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if 0:",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "class .*\\bProtocol\\):",
+  "@(abc\\.)?abstractmethod",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-markers",
+  "--strict-config",
+  "--tb=short",
+  "--import-mode=importlib",
+]
+# Every test directory in the repo. Previously ["tests"] only, which silently
+# excluded all 65 test files under packages/ from `pytest` at the repo root.
+testpaths = ["tests", "packages/pycypher-tui/tests"]
+pythonpath = [".", "tests"]
+consider_namespace_packages = true
+# Required by pycypher-tui's async tests, which use bare `async def test_*`
+# with no @pytest.mark.asyncio. This was previously set only in
+# packages/pycypher-tui/pyproject.toml, so it applied only when pytest was
+# invoked from inside that directory.
+asyncio_mode = "auto"
+norecursedirs = [
+  "google-cloud-sdk",
+  ".venv",
+  ".git",
+  "node_modules",
+  ".claude",
+  "build",
+]
+markers = [
+  "slow: Marks tests as slow (deselect with '-m \"not slow\"')",
+  "integration: Integration tests (deselect with '-m \"not integration\"')",
+  "spark: Tests that require PySpark installation (deselect with '-m \"not spark\"')",
+  "performance: Performance benchmarking tests (deselect with '-m \"not performance\"')",
+  "cluster: Tests that require Spark cluster (deselect with '-m \"not cluster\"')",
+  "unit: Unit tests (select with '-m unit')",
+  "pandas_only: Tests that only use Pandas backend (select with '-m pandas_only')",
+  "dual_backend: Tests that compare Pandas and Spark backends (deselect with '-m \"not dual_backend\"')",
+  "neo4j: Tests that require a live Neo4j instance (deselect with '-m \"not neo4j\"')",
+  "performance_comparison: Performance comparison benchmarks",
+  "performance_target: Tests with specific performance targets",
+  "security: Security-focused tests",
+  "timeout: Override default test timeout (e.g. @pytest.mark.timeout(60))",
+]
+timeout = 30
+# Performance optimizations
+minversion = "8.0"
+# Don't capture output for faster execution (use -s to override)
+# addopts already includes necessary flags
+
+
+[tool.bandit]
+# Bandit SAST configuration — tuned for this project's patterns.
+# Suppress false positives for patterns we've manually audited as safe.
+skips = [
+  "B101", # assert used in tests and validation (not security-relevant)
+  "B311", # random module — our rand() function uses it intentionally for Cypher semantics
+  "B404", # subprocess import — not used in packages/, only flagged in tests
+]
+targets = [
+  "packages/pycypher/src",
+  "packages/shared/src",
+  "packages/pycypher-tui/src",
+]
+
+[dependency-groups]
+# Lightweight dev environment for core pycypher work (no Spark/Dask/Polars).
+# Install with: uv sync --group dev-core
+dev-core = [
+  # Testing frameworks
+  "pytest>=9.0.3,<10.0.0",          # 9.0.3 fixes CVE-2025-71176 (insecure tmp dir)
+  "pytest-cov>=6.0.0,<7.0.0",
+  "pytest-xdist>=3.6.1,<4.0.0",
+  "pytest-mock>=3.14.0,<4.0.0",
+  "pytest-timeout>=2.3.1,<3.0.0",
+  "pytest-benchmark>=4.0.0,<5.0.0", # Performance benchmarking
+  "pytest-watch>=4.2.0,<5.0.0",     # File-watching test runner for TDD
+  "pytest-asyncio>=1.3.0,<2.0.0",   # Required by pycypher-tui async test fixtures
+  "hypothesis>=6.100.0,<7.0.0",     # Property-based testing (tests/property_based/)
+  "textual-dev>=1.0.0,<2.0.0",      # `textual run --dev` console for pycypher-tui
+
+  # Code quality
+  "ruff>=0.6.3,<1.0.0",
+  "ty>=0.0.17,<0.1.0",
+  "pip-audit>=2.7.0,<3.0.0",  # Dependency vulnerability scanning
+  "bandit>=1.8.0,<2.0.0",     # Static application security testing (SAST)
+  "pre-commit>=4.0.0,<5.0.0", # Git pre-commit hook framework
+
+  # Documentation
+  "myst-parser>=4.0.1,<5.0.0",
+  "sphinx>=7.4.7,<9.0.0",
+  "sphinx-rtd-theme>=3.0.0,<4.0.0", # Sphinx Read the Docs theme
+
+  # Runtime utilities used in tests
+  "psutil>=5.9.0,<8.0.0", # System and process utilities for performance monitoring
+  "httpx>=0.27.0,<1.0.0",
+]
+
+# Full dev environment: includes dev-core + distributed computing + Neo4j.
+# Install with: uv sync --group dev
+dev = [
+  { include-group = "dev-core" },
+
+  # PySpark and distributed computing dependencies
+  "pyspark[sql]>=3.5.0,<5.0.0", # Main PySpark library with SQL functionality
+  "delta-spark>=3.0.0,<5.0.0",  # Delta Lake for advanced data management
+
+  # Large dataset backend dependencies
+  "dask[dataframe]>=2025.1.0,<2027.0.0", # Primary large-dataset backend (pandas-compatible)
+  "distributed>=2025.1.0,<2027.0.0",     # Dask distributed scheduler
+  "polars>=1.0.0,<2.0.0",                # Alternative high-performance backend
+  "deltalake>=0.18.0,<2.0.0",            # Delta Lake Python bindings (storage layer)
+
+  # Neo4j driver
+  "neo4j>=5.0.0,<7.0.0", # Official Neo4j Python driver (ceiling matches pycypher optional)
+]
+
+# Full development environment: includes dev + interactive tools, profiling, visualization.
+# Install with: uv sync --group dev-full
+dev-full = [
+  { include-group = "dev" },
+
+  # Interactive development
+  "jupyter>=1.0.0,<2.0.0",    # Interactive notebooks for development
+  "jupyterlab>=4.0.0,<5.0.0", # Advanced Jupyter interface
+
+  # Visualization and analysis
+  "matplotlib>=3.7.0,<4.0.0", # Plotting for performance analysis
+  "seaborn>=0.12.0,<1.0.0",   # Statistical visualizations
+
+  # Profiling utilities
+  "memory-profiler>=0.61.0,<1.0.0", # Memory usage profiling
+  "py-spy>=0.3.14,<1.0.0",          # Python profiler for performance analysis
+]

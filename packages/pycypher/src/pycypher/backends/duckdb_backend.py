@@ -1,0 +1,1136 @@
+"""DuckDB-based backend for analytical workloads.
+
+Uses DuckDB's in-process OLAP engine for efficient columnar operations.
+Particularly effective for:
+
+- Large aggregations (GROUP BY with many groups)
+- Join optimisation (DuckDB's query planner handles strategy selection)
+- Sort/limit composition (DuckDB fuses ORDER BY + LIMIT efficiently)
+"""
+
+from __future__ import annotations
+
+import contextvars
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, NamedTuple
+
+import pandas as pd
+from shared.logger import LOGGER
+
+from pycypher.backends._helpers import (
+    _pandas_agg_to_sql,
+    _to_pandas,
+    validate_identifier,
+)
+from pycypher.constants import ID_COLUMN
+from pycypher.cypher_types import BackendMask, SourceObject
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from pycypher.backends.table_registry import TableRegistry
+
+
+#: Mapping of spill-config setting name → environment variable used as the
+#: fallback when the corresponding constructor argument is ``None``.
+_SPILL_ENV_VARS: dict[str, str] = {
+    "memory_limit": "PYCYPHER_DUCKDB_MEMORY_LIMIT",
+    "temp_directory": "PYCYPHER_DUCKDB_TEMP_DIRECTORY",
+    "max_temp_directory_size": "PYCYPHER_DUCKDB_MAX_TEMP_DIRECTORY_SIZE",
+    "preserve_insertion_order": "PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER",
+}
+
+_TRUE_STRINGS = frozenset({"1", "true", "yes", "on"})
+_FALSE_STRINGS = frozenset({"0", "false", "no", "off"})
+
+
+def _parse_bool(value: str) -> bool:
+    """Parse a boolean from an environment-variable string.
+
+    Raises:
+        ValueError: If *value* is not a recognised boolean spelling.
+
+    """
+    lowered = value.strip().lower()
+    if lowered in _TRUE_STRINGS:
+        return True
+    if lowered in _FALSE_STRINGS:
+        return False
+    msg = (
+        f"Invalid boolean for PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER: "
+        f"{value!r}. Use one of true/false/1/0/yes/no/on/off."
+    )
+    raise ValueError(msg)
+
+
+def _spill_config(
+    *,
+    memory_limit: str | None,
+    temp_directory: str | None,
+    max_temp_directory_size: str | None,
+    preserve_insertion_order: bool | None,
+) -> dict[str, Any]:
+    """Build a DuckDB ``connect(config=...)`` dict from args + env fallbacks.
+
+    Each setting is included only when explicitly provided or present in the
+    environment; otherwise it is omitted so DuckDB's default applies.  Returns
+    an empty dict when nothing is configured (behaviour identical to the
+    historical ``duckdb.connect(":memory:")``).
+    """
+    import os
+
+    config: dict[str, Any] = {}
+
+    for key in ("memory_limit", "temp_directory", "max_temp_directory_size"):
+        explicit = {
+            "memory_limit": memory_limit,
+            "temp_directory": temp_directory,
+            "max_temp_directory_size": max_temp_directory_size,
+        }[key]
+        value = (
+            explicit
+            if explicit is not None
+            else os.environ.get(
+                _SPILL_ENV_VARS[key],
+            )
+        )
+        if value:
+            config[key] = value
+
+    pio = preserve_insertion_order
+    if pio is None:
+        env_val = os.environ.get(_SPILL_ENV_VARS["preserve_insertion_order"])
+        if env_val is not None:
+            pio = _parse_bool(env_val)
+    if pio is not None:
+        config["preserve_insertion_order"] = pio
+
+    return config
+
+
+def create_duckdb_connection(
+    *,
+    database_path: str | None = None,
+    memory_limit: str | None = None,
+    temp_directory: str | None = None,
+    max_temp_directory_size: str | None = None,
+    preserve_insertion_order: bool | None = None,
+) -> Any:
+    """Create a persistent DuckDB connection for out-of-core reads.
+
+    Applies the same opt-in spill settings as :class:`DuckDBBackend` (see
+    :func:`_spill_config`) plus ``arrow_large_buffer_size`` — required so very
+    large/wide string columns don't overflow Arrow's 32-bit offsets.
+
+    Unlike the throwaway connections in ``DataSource.read``, this connection is
+    intended to be **held and shared** across ingestion (``read_relation``) and
+    query execution so relations stay inside a single DuckDB instance and can
+    spill to disk rather than materialising to pandas/Arrow.
+
+    Args:
+        database_path: Path to a file-backed DuckDB database. When ``None``
+            (default), an in-memory (``:memory:``) database is used —
+            behaviour is unchanged from before this parameter existed.
+
+    Returns:
+        An open ``duckdb.DuckDBPyConnection``.  The caller owns its lifecycle
+        and must ``close()`` it.
+
+    """
+    import duckdb
+
+    config = _spill_config(
+        memory_limit=memory_limit,
+        temp_directory=temp_directory,
+        max_temp_directory_size=max_temp_directory_size,
+        preserve_insertion_order=preserve_insertion_order,
+    )
+    con = duckdb.connect(database_path or ":memory:", config=config)
+    con.execute("SET arrow_large_buffer_size=true")
+    return con
+
+
+#: Env var overriding the parent directory for scratch DuckDB database
+#: files.  Deliberately separate from ``PYCYPHER_DUCKDB_TEMP_DIRECTORY``
+#: (used for spill files, sized/cleaned independently — see
+#: docs/duckdb_full_parity_design.md, "Scratch file location").
+_SCRATCH_DIR_ENV_VAR = "PYCYPHER_DUCKDB_SCRATCH_DIRECTORY"
+
+#: Filename prefix identifying pycypher scratch database files, used by both
+#: the creator and the orphan sweep so unrelated files in the same directory
+#: are never touched.
+_SCRATCH_FILE_PREFIX = "pycypher-duckdb-run-"
+
+#: Orphaned scratch files (from a hard-killed prior run) older than this are
+#: removed by :func:`sweep_orphaned_scratch_databases`. A run normally
+#: deletes its own file within seconds, so anything past a day is orphaned,
+#: not just slow.
+_ORPHAN_MAX_AGE_SECONDS = 86_400
+
+
+def _scratch_directory() -> str:
+    """Return the parent directory for scratch DuckDB database files."""
+    import os
+    import tempfile
+
+    override = os.environ.get(_SCRATCH_DIR_ENV_VAR)
+    directory = override or tempfile.gettempdir()
+    os.makedirs(directory, exist_ok=True)
+    return directory
+
+
+def memory_limit_configured() -> bool:
+    """Return ``True`` if a DuckDB memory budget is set in the environment.
+
+    Used to decide whether a file-backed scratch database is worth creating.
+    Measured on a 200k x 22 workload
+    (``tests/benchmarks/bench_duckdb_eager_path_memory.py``), a file-backed
+    database **on its own costs memory** rather than saving it — 125 MB of
+    query-time RSS against 115 MB for ``:memory:`` — because DuckDB has no
+    reason to evict buffer-pool pages until it is told a budget. Paired with
+    a limit it is the only configuration that helps, at 94 MB. So the file is
+    created exactly when a limit exists to make use of it.
+    """
+    import os
+
+    return bool(os.environ.get(_SPILL_ENV_VARS["memory_limit"], "").strip())
+
+
+def create_scratch_database_path() -> str:
+    """Return a fresh, run-unique path for a file-backed scratch database.
+
+    Does not create the file itself — ``duckdb.connect()`` does that lazily
+    on first use. Each call returns a distinct path (via a UUID component),
+    so concurrent callers never collide even though concurrent runs are not
+    otherwise supported (see docs/duckdb_full_parity_design.md).
+    """
+    import uuid
+
+    directory = _scratch_directory()
+    filename = f"{_SCRATCH_FILE_PREFIX}{uuid.uuid4().hex}.duckdb"
+    return f"{directory}/{filename}"
+
+
+def sweep_orphaned_scratch_databases(
+    max_age_seconds: float = _ORPHAN_MAX_AGE_SECONDS,
+) -> list[str]:
+    """Delete scratch database files left behind by a hard-killed prior run.
+
+    Only removes files matching the ``pycypher-duckdb-run-*`` naming
+    convention in the scratch directory, and only those older than
+    *max_age_seconds* — a live run's own file is always younger than that.
+    Disk hygiene only; correctness does not depend on this running (each run
+    gets a fresh, unique path regardless). Best-effort: a file that
+    disappears or can't be removed between listing and deletion is skipped.
+
+    Returns:
+        Paths of files that were removed.
+
+    """
+    import glob
+    import os
+    import time
+
+    directory = _scratch_directory()
+    pattern = f"{directory}/{_SCRATCH_FILE_PREFIX}*.duckdb"
+    now = time.time()
+    removed: list[str] = []
+    for path in glob.glob(pattern):
+        try:
+            if now - os.path.getmtime(path) < max_age_seconds:
+                continue
+            os.remove(path)
+            removed.append(path)
+        except OSError:
+            LOGGER.warning(
+                "Failed to remove orphaned scratch database %s; skipping",
+                path,
+                exc_info=True,
+            )
+    return removed
+
+
+# ---------------------------------------------------------------------------
+# Materialisation tripwire
+# ---------------------------------------------------------------------------
+#
+# Phase 1c of docs/duckdb_eager_path_design.md.  Every point where a lazy
+# DuckDB relation is forced into pandas is a point where the out-of-core
+# guarantee is lost.  Counting them is what makes the rest of that plan
+# measurable: a phase is done when the queries it covers materialise zero
+# times, and that is an assertion a test can make rather than a claim a
+# human has to eyeball in a profile.
+
+
+class MaterialisationEvent(NamedTuple):
+    """One forced materialisation of a lazy relation into pandas.
+
+    Attributes:
+        columns: Column names of the relation that was materialised.
+        rows: Number of rows produced.
+        origin: ``"file:line"`` of the caller that forced it, or ``None``
+            when the enclosing scope was opened without ``capture_stack``.
+
+    """
+
+    columns: tuple[str, ...]
+    rows: int
+    origin: str | None
+
+
+class MaterialisationLog:
+    """Records forced materialisations within a :func:`count_materialisations` scope.
+
+    Nested scopes each see their own events *and* propagate them outward, so
+    an inner scope opened by a helper never hides work from an outer
+    assertion.
+    """
+
+    __slots__ = ("events", "_parent", "_capture_stack")
+
+    def __init__(
+        self,
+        parent: MaterialisationLog | None = None,
+        *,
+        capture_stack: bool = False,
+    ) -> None:
+        self.events: list[MaterialisationEvent] = []
+        self._parent = parent
+        self._capture_stack = capture_stack
+
+    @property
+    def count(self) -> int:
+        """Number of materialisations recorded in this scope."""
+        return len(self.events)
+
+    @property
+    def rows(self) -> int:
+        """Total rows materialised across all events in this scope."""
+        return sum(e.rows for e in self.events)
+
+    @property
+    def capture_stack(self) -> bool:
+        """Whether this scope resolves an origin for each event."""
+        return self._capture_stack or (
+            self._parent is not None and self._parent.capture_stack
+        )
+
+    def record(self, event: MaterialisationEvent) -> None:
+        """Record *event* here and in every enclosing scope."""
+        self.events.append(event)
+        if self._parent is not None:
+            self._parent.record(event)
+
+    def __len__(self) -> int:
+        return len(self.events)
+
+    def __bool__(self) -> bool:
+        # A log with no events is still a valid object; don't let the
+        # __len__ fallback make an empty log falsy in `if log:` checks.
+        return True
+
+    def __repr__(self) -> str:
+        return f"MaterialisationLog(count={self.count}, rows={self.rows})"
+
+
+_MATERIALISATION_LOG: contextvars.ContextVar[MaterialisationLog | None] = (
+    contextvars.ContextVar("pycypher_materialisation_log", default=None)
+)
+
+
+@contextmanager
+def count_materialisations(
+    *,
+    capture_stack: bool = False,
+) -> Iterator[MaterialisationLog]:
+    """Count lazy-relation materialisations occurring in this scope.
+
+    Usage::
+
+        with count_materialisations() as log:
+            star.execute_query(cypher)
+        assert log.count == 0
+
+    Args:
+        capture_stack: When ``True``, resolve a ``"file:line"`` origin for
+            every event so a materialisation can be traced back to the
+            operator that forced it.  Off by default — walking the stack on
+            every materialisation is far too expensive for production paths.
+
+    Yields:
+        The :class:`MaterialisationLog` for this scope.
+
+    """
+    log = MaterialisationLog(
+        _MATERIALISATION_LOG.get(),
+        capture_stack=capture_stack,
+    )
+    token = _MATERIALISATION_LOG.set(log)
+    try:
+        yield log
+    finally:
+        _MATERIALISATION_LOG.reset(token)
+
+
+#: Modules whose frames are skipped when resolving an event origin — the
+#: interesting caller is the operator that forced materialisation, never the
+#: lazy-frame plumbing that performed it.
+_ORIGIN_SKIP_SUFFIXES = ("backends/duckdb_backend.py",)
+
+
+def _resolve_origin() -> str | None:
+    """Return ``"file:line"`` for the nearest caller outside this module."""
+    import traceback
+
+    for frame in reversed(traceback.extract_stack()[:-1]):
+        if not frame.filename.endswith(_ORIGIN_SKIP_SUFFIXES):
+            return f"{frame.filename}:{frame.lineno}"
+    return None
+
+
+def _record_materialisation(columns: list[str], rows: int) -> None:
+    """Record a forced materialisation with the active log, if any."""
+    log = _MATERIALISATION_LOG.get()
+    if log is None:
+        return
+    log.record(
+        MaterialisationEvent(
+            columns=tuple(columns),
+            rows=rows,
+            origin=_resolve_origin() if log.capture_stack else None,
+        ),
+    )
+
+
+class DuckDBLazyFrame:
+    """Internal lazy wrapper around a DuckDB Relation.
+
+    Holds a DuckDB Relation representing a pending query.  When passed
+    back into a ``DuckDBBackend`` operation, the backend can compose SQL
+    rather than materialising and re-registering.
+
+    Transparent to callers: attribute access, iteration, and item access
+    auto-materialise to a pandas DataFrame (cached).  ``columns`` and
+    ``__len__`` are answered without full materialisation.
+    """
+
+    __slots__ = ("_relation", "_conn", "_materialised", "_backend_ref")
+
+    def __init__(
+        self,
+        relation: Any,
+        conn: Any,
+        backend: Any = None,
+    ) -> None:
+        self._relation = relation
+        self._conn = conn
+        self._materialised: pd.DataFrame | None = None
+        self._backend_ref = backend
+
+    @property
+    def relation(self) -> Any:
+        """The underlying DuckDB Relation."""
+        return self._relation
+
+    @property
+    def columns(self) -> list[str]:
+        """Column names (O(1) from relation schema)."""
+        return self._relation.columns
+
+    def _materialise(self) -> pd.DataFrame:
+        """Materialise the relation, caching the result.
+
+        Every call that actually executes (as opposed to returning the cache)
+        is reported to any active :func:`count_materialisations` scope — this
+        is the single choke point through which a lazy relation becomes
+        pandas, and therefore the only place the tripwire needs to live.
+        """
+        if self._materialised is None:
+            self._materialised = self._relation.fetchdf()
+            _record_materialisation(
+                self._relation.columns,
+                len(self._materialised),
+            )
+        return self._materialised
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Materialise the lazy relation into a pandas DataFrame."""
+        return self._materialise()
+
+    def __len__(self) -> int:
+        if self._materialised is not None:
+            return len(self._materialised)
+        try:
+            row = self._relation.aggregate("COUNT(*) AS _cnt").fetchone()
+            return row[0] if row else 0
+        except Exception:  # noqa: BLE001 — graceful fallback to materialised count
+            return len(self._materialise())
+
+    def __contains__(self, item: str) -> bool:
+        return item in self._relation.columns
+
+    def __getattr__(self, name: str) -> Any:
+        """Auto-materialise and delegate to pandas DataFrame."""
+        return getattr(self._materialise(), name)
+
+    def __getitem__(self, key: Any) -> Any:
+        return self._materialise()[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._materialise()[key] = value
+
+    def __iter__(self) -> Any:
+        return iter(self._materialise())
+
+    def __repr__(self) -> str:
+        return f"DuckDBLazyFrame(columns={self._relation.columns!r})"
+
+
+def _is_lazy(obj: Any) -> bool:
+    """Check if *obj* is a DuckDBLazyFrame."""
+    return isinstance(obj, DuckDBLazyFrame)
+
+
+def _to_df(frame: Any) -> pd.DataFrame:
+    """Materialise *frame* to pandas if lazy, otherwise convert."""
+    if _is_lazy(frame):
+        return frame.to_pandas()
+    if isinstance(frame, pd.DataFrame):
+        return frame
+    return _to_pandas(frame)
+
+
+class DuckDBBackend:
+    """DuckDB-based backend for analytical workloads.
+
+    Uses DuckDB's in-process OLAP engine for efficient columnar operations.
+    Particularly effective for:
+
+    - Large aggregations (GROUP BY with many groups)
+    - Join optimisation (DuckDB's query planner handles strategy selection)
+    - Sort/limit composition (DuckDB fuses ORDER BY + LIMIT efficiently)
+
+    The ``sort()`` method returns a ``DuckDBLazyFrame`` so that a subsequent
+    ``limit()`` can compose ORDER BY + LIMIT into a single DuckDB query.
+    All other operations accept ``DuckDBLazyFrame`` inputs transparently
+    and return ``pd.DataFrame`` for full backward compatibility.
+    """
+
+    def __init__(
+        self,
+        *,
+        database_path: str | None = None,
+        own_database_file: bool = False,
+        memory_limit: str | None = None,
+        temp_directory: str | None = None,
+        max_temp_directory_size: str | None = None,
+        preserve_insertion_order: bool | None = None,
+    ) -> None:
+        """Create a new DuckDB backend with an in-memory or file-backed connection.
+
+        The connection is created immediately and held for the lifetime of
+        the backend.  Use as a context manager or call :meth:`close` to
+        release the underlying DuckDB resources.
+
+        Spill / out-of-core settings are **opt-in**: any argument left as
+        ``None`` falls back to its ``PYCYPHER_DUCKDB_*`` environment variable
+        (see :func:`_spill_config`), and if that is also unset the DuckDB
+        default is used unchanged.  Settings are passed through DuckDB's
+        ``connect(config=...)`` dict rather than interpolated into SQL, so
+        operator-supplied values cannot inject SQL.
+
+        Args:
+            database_path: Path to a file-backed DuckDB database, enabling
+                genuinely mutable, persistent tables (see
+                ``docs/duckdb_full_parity_design.md``). When ``None``
+                (default), an in-memory (``:memory:``) database is used, as
+                before this parameter existed. Unless *own_database_file* is
+                set, the caller owns the file's lifecycle (creation and
+                deletion) and this class only opens and closes the
+                connection.
+            own_database_file: When ``True``, :meth:`close` deletes
+                *database_path* after closing the connection. Use for a
+                throwaway scratch database (see
+                :func:`create_scratch_database_path`) so the file does not
+                outlive the backend that created it. Ignored when
+                *database_path* is ``None``.
+            memory_limit: Soft RAM budget before DuckDB spills to disk
+                (e.g. ``"4GB"``).  Env: ``PYCYPHER_DUCKDB_MEMORY_LIMIT``.
+            temp_directory: Directory for spilled intermediates.
+                Env: ``PYCYPHER_DUCKDB_TEMP_DIRECTORY``.
+            max_temp_directory_size: Cap on spill directory size
+                (e.g. ``"50GB"``).
+                Env: ``PYCYPHER_DUCKDB_MAX_TEMP_DIRECTORY_SIZE``.
+            preserve_insertion_order: When ``False``, DuckDB may reorder rows
+                to reduce memory on large results.  Left unset by default so
+                ordering semantics are unchanged.
+                Env: ``PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER``.
+
+        """
+        import duckdb
+
+        config = _spill_config(
+            memory_limit=memory_limit,
+            temp_directory=temp_directory,
+            max_temp_directory_size=max_temp_directory_size,
+            preserve_insertion_order=preserve_insertion_order,
+        )
+        self._database_path: str | None = database_path
+        self._own_database_file: bool = bool(
+            own_database_file and database_path
+        )
+        self._conn: Any = duckdb.connect(
+            database_path or ":memory:", config=config
+        )
+        self._view_counter: int = 0
+        #: Lazily created so a backend that never registers a table pays
+        #: nothing.  See the ``tables`` property.
+        self._tables: TableRegistry | None = None
+
+    def _next_view(self, prefix: str = "_v") -> str:
+        """Generate a unique view name to avoid collisions."""
+        self._view_counter += 1
+        return f"{prefix}_{self._view_counter}"
+
+    # -- Context manager & cleanup -----------------------------------------
+
+    def close(self) -> None:
+        """Explicitly close the DuckDB connection.
+
+        Safe to call multiple times — subsequent calls are no-ops.  Uses
+        ``getattr`` so it is also safe when ``__init__`` raised before
+        ``_conn`` was assigned (e.g. invalid spill config), which ``__del__``
+        would otherwise turn into an ``AttributeError`` at GC time.
+
+        When the backend owns its database file (``own_database_file``), the
+        file is deleted here, after the connection is closed.
+        """
+        if getattr(self, "_conn", None) is not None:
+            try:
+                self._conn.close()
+            except Exception:  # noqa: BLE001 — best-effort connection cleanup
+                LOGGER.warning(
+                    "DuckDB connection close raised; ignoring",
+                    exc_info=True,
+                )
+            finally:
+                self._conn = None
+                # Registered relations are bound to the now-closed
+                # connection; drop them rather than hand out dead handles.
+                self._tables = None
+                self._remove_owned_database_file()
+
+    def _remove_owned_database_file(self) -> None:
+        """Delete the scratch database file, if this backend owns it.
+
+        Best-effort and deliberately silent on failure: this runs from
+        ``close()``, which ``__del__`` calls, so it can execute during
+        interpreter shutdown when module globals are already being torn
+        down.  A leftover file is a disk-hygiene problem that
+        :func:`sweep_orphaned_scratch_databases` exists to mop up, never a
+        correctness one — every run gets its own unique path.
+        """
+        if not getattr(self, "_own_database_file", False):
+            return
+        path = getattr(self, "_database_path", None)
+        if not path:
+            return
+        self._own_database_file = False
+        try:
+            from pathlib import Path
+
+            # DuckDB writes a sibling write-ahead log; remove it too, or the
+            # sweep would keep finding an orphan next to a deleted database.
+            for candidate in (Path(path), Path(f"{path}.wal")):
+                candidate.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001 — may run at interpreter shutdown
+            pass
+
+    def __enter__(self) -> DuckDBBackend:
+        """Enter the context manager, returning this backend instance."""
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        """Exit the context manager, closing the DuckDB connection."""
+        self.close()
+
+    def __del__(self) -> None:
+        """Release the DuckDB connection on garbage collection."""
+        self.close()
+
+    @property
+    def name(self) -> str:
+        """Return ``'duckdb'``."""
+        return "duckdb"
+
+    @property
+    def database_path(self) -> str | None:
+        """Path to the file-backed database, or ``None`` if in-memory."""
+        return self._database_path
+
+    @property
+    def connection(self) -> Any:
+        """The underlying DuckDB connection.
+
+        Exposed so the out-of-core relation engine can build and stream
+        relations on the same (spill-configured) connection the backend uses.
+        """
+        return self._conn
+
+    @property
+    def tables(self) -> TableRegistry:
+        """Registry of DuckDB tables materialised from the Context's sources.
+
+        The single owner of source materialisation — see
+        :mod:`pycypher.backends.table_registry` and Phase 1a of
+        ``docs/duckdb_eager_path_design.md``.  Created on first access so a
+        backend used only for one-off frame operations never builds one.
+        """
+        if self._tables is None:
+            from pycypher.backends.table_registry import TableRegistry
+
+            self._tables = TableRegistry(self._conn)
+        return self._tables
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _execute_sql(
+        self,
+        sql: str,
+        views: dict[str, Any],
+        params: list[Any] | None = None,
+    ) -> pd.DataFrame:
+        """Register *views*, execute *sql*, unregister, and return the result.
+
+        Accepts both ``pd.DataFrame`` and ``DuckDBLazyFrame`` as view values.
+        Lazy frames are materialised before registration.
+
+        Args:
+            sql: The SQL statement to execute.
+            views: Mapping of view name → frame to register before execution.
+            params: Optional positional parameters for the SQL statement
+                (referenced as ``$1``, ``$2``, … in the query).
+
+        Returns:
+            The query result as a pandas DataFrame.
+
+        """
+        LOGGER.debug("[duckdb] %s", sql)
+        for view_name, frame in views.items():
+            self._conn.register(view_name, _to_df(frame))
+        try:
+            result: pd.DataFrame = self._conn.execute(
+                sql,
+                params or [],
+            ).fetchdf()
+        finally:
+            for view_name in views:
+                try:
+                    self._conn.unregister(view_name)
+                except Exception:  # noqa: BLE001 — best-effort view cleanup
+                    LOGGER.debug(
+                        "Failed to unregister DuckDB view %r",
+                        view_name,
+                        exc_info=True,
+                    )
+        return result
+
+    # ------------------------------------------------------------------
+    # Scan
+    # ------------------------------------------------------------------
+
+    def scan_entity(
+        self,
+        source_obj: SourceObject,
+        entity_type: str,
+    ) -> pd.DataFrame:
+        """Register source in DuckDB and return ID column."""
+        df = _to_pandas(source_obj)
+        view_name = f"_entity_{validate_identifier(entity_type)}"
+        return self._execute_sql(
+            f'SELECT "{ID_COLUMN}" FROM "{view_name}"',  # nosec B608 — view_name validated by validate_identifier
+            {view_name: df},
+        )
+
+    # ------------------------------------------------------------------
+    # Transform
+    # ------------------------------------------------------------------
+
+    def filter(
+        self, frame: pd.DataFrame | DuckDBLazyFrame, mask: BackendMask
+    ) -> pd.DataFrame:
+        """Boolean mask filter — delegates to pandas.
+
+        Mask-based filtering cannot be expressed as lazy DuckDB SQL
+        because the mask is computed externally as a numpy array.
+        """
+        return _to_df(frame).loc[mask].reset_index(drop=True)
+
+    def join(
+        self,
+        left: Any,
+        right: Any,
+        on: str | list[str],
+        how: str = "inner",
+        strategy: str = "auto",
+    ) -> pd.DataFrame:
+        """Join via DuckDB SQL for optimal join strategy selection.
+
+        The *strategy* parameter is accepted for protocol compatibility but
+        ignored — DuckDB's query planner selects the optimal join algorithm
+        internally based on table statistics.
+
+        When both sides are lazy the join composes into a relation instead of
+        executing.  This changes *when* the work happens, not what it
+        produces: the eager path was already SQL, so column selection, row
+        order and join semantics are identical either way.
+        """
+        if _is_lazy(left) and _is_lazy(right):
+            joined = self._join_lazy(left, right, on, how)
+            if joined is not None:
+                return joined
+
+        left_df = _to_df(left)
+        right_df = _to_df(right)
+        lv = self._next_view("_jl")
+        rv = self._next_view("_jr")
+
+        if how == "cross":
+            sql = f'SELECT * FROM "{lv}" CROSS JOIN "{rv}"'
+        else:
+            if isinstance(on, str):
+                on = [on]
+            for col in on:
+                validate_identifier(col)
+            join_cond = " AND ".join(
+                f'"{lv}"."{col}" = "{rv}"."{col}"' for col in on
+            )
+            join_type = {"inner": "INNER", "left": "LEFT"}.get(how, "INNER")
+
+            right_cols = [c for c in right_df.columns if c not in on]
+            select_right = ", ".join(
+                f'"{rv}"."{validate_identifier(c)}"' for c in right_cols
+            )
+            select_clause = f'"{lv}".*'
+            if select_right:
+                select_clause += f", {select_right}"
+
+            sql = (
+                f"SELECT {select_clause} "  # nosec B608 — all column names validated by validate_identifier
+                f'FROM "{lv}" {join_type} JOIN "{rv}" ON {join_cond}'
+            )
+
+        return self._execute_sql(sql, {lv: left_df, rv: right_df})
+
+    def _join_lazy(
+        self,
+        left: DuckDBLazyFrame,
+        right: DuckDBLazyFrame,
+        on: str | list[str],
+        how: str,
+    ) -> DuckDBLazyFrame | None:
+        """Compose a lazy join, or ``None`` to fall back to the eager path.
+
+        Reproduces the eager SQL's output exactly: every left column in
+        order, then the right columns that are not join keys.  DuckDB's
+        relational ``join`` keeps *both* sides' key columns, which would
+        leave two identically-named columns, so the projection is explicit.
+        """
+        left_alias, right_alias = "_pyc_jl", "_pyc_jr"
+        keys = [on] if isinstance(on, str) else list(on)
+
+        try:
+            left_rel = left.relation.set_alias(left_alias)
+            right_rel = right.relation.set_alias(right_alias)
+            if how == "cross":
+                # `.join(..., how="cross")` is not accepted; an unconditional
+                # inner join is the same thing and keeps both sides' columns
+                # in the order the eager CROSS JOIN produced.
+                joined = left_rel.join(right_rel, "true", how="inner")
+                return DuckDBLazyFrame(joined, self._conn, backend=self)
+
+            join_type = {"inner": "inner", "left": "left"}.get(how)
+            if join_type is None:
+                return None
+            for key in keys:
+                validate_identifier(key)
+            condition = " AND ".join(
+                f'"{left_alias}"."{k}" = "{right_alias}"."{k}"' for k in keys
+            )
+            joined = left_rel.join(right_rel, condition, how=join_type)
+            projection = ", ".join(
+                [
+                    f"{left_alias}.*",
+                    *(
+                        f'"{right_alias}"."{c}"'
+                        for c in right.columns
+                        if c not in keys
+                    ),
+                ],
+            )
+            return DuckDBLazyFrame(
+                joined.project(projection), self._conn, backend=self
+            )
+        except Exception:  # noqa: BLE001 — fall back to the eager join
+            LOGGER.debug("Lazy join failed; materialising", exc_info=True)
+            return None
+
+    def rename(
+        self,
+        frame: Any,
+        columns: dict[str, str],
+    ) -> Any:
+        """Rename columns, staying lazy when the input is lazy.
+
+        A lazy input is renamed by projection, preserving column order.
+        Falls back to pandas when the rename would produce duplicate column
+        names — which pandas tolerates and SQL cannot express.
+        """
+        if _is_lazy(frame):
+            renamed = self._rename_lazy(frame, columns)
+            if renamed is not None:
+                return renamed
+        return _to_df(frame).rename(columns=columns)
+
+    def _rename_lazy(
+        self,
+        frame: DuckDBLazyFrame,
+        columns: dict[str, str],
+    ) -> DuckDBLazyFrame | None:
+        """Project *frame* with renamed columns, or ``None`` if unsafe."""
+        existing = list(frame.columns)
+        result = [columns.get(c, c) for c in existing]
+        if len(set(result)) != len(result):
+            # pandas would produce duplicate labels here; SQL would produce
+            # an ambiguous relation.  Let pandas keep its behaviour.
+            return None
+        projections = ", ".join(
+            f'"{old}" AS "{new}"' if old != new else f'"{old}"'
+            for old, new in zip(existing, result, strict=True)
+        )
+        try:
+            return DuckDBLazyFrame(
+                frame.relation.project(projections), self._conn, backend=self
+            )
+        except Exception:  # noqa: BLE001 — fall back to the pandas rename
+            LOGGER.debug("Lazy rename failed; using pandas", exc_info=True)
+            return None
+
+    def concat(
+        self,
+        frames: list[Any],
+        *,
+        ignore_index: bool = True,
+    ) -> Any:
+        """Concatenate frames, staying lazy when every input is lazy.
+
+        Falls back to ``pd.concat`` unless the inputs are *exactly*
+        compatible — see :meth:`_concat_lazy` for why the bar is that high.
+        """
+        if ignore_index:
+            unioned = self._concat_lazy(frames)
+            if unioned is not None:
+                return unioned
+        return pd.concat(
+            [_to_df(f) for f in frames],
+            ignore_index=ignore_index,
+        )
+
+    def _concat_lazy(self, frames: list[Any]) -> DuckDBLazyFrame | None:
+        """``UNION ALL`` *frames*, or ``None`` when that would diverge.
+
+        DuckDB's ``relation.union()`` is positional, not by name, and it
+        silently coerces mismatched types.  Two concrete divergences from
+        ``pd.concat`` follow, and both return wrong answers rather than
+        errors, so each is guarded rather than trusted:
+
+        * **Differing column sets.** ``pd.concat`` produces the union of
+          columns with nulls filling the gaps; ``union()`` lines the columns
+          up by position and keeps the left relation's names, silently
+          mislabelling data.
+        * **Differing column types.** Concatenating an integer column with a
+          text one gives ``object`` dtype holding ``[1, 2, "x"]`` in pandas
+          but ``["1", "2", "x"]`` in DuckDB — the integers become strings.
+
+        So the lazy path is taken only when every frame is lazy and all of
+        them share identical column names *in the same order* with identical
+        types.  Anything else falls back to pandas, which is slower but keeps
+        the established semantics.
+        """
+        if not frames or not all(_is_lazy(f) for f in frames):
+            return None
+        first = frames[0]
+        columns = list(first.columns)
+        types = [str(t) for t in first.relation.types]
+        for other in frames[1:]:
+            if list(other.columns) != columns:
+                return None
+            if [str(t) for t in other.relation.types] != types:
+                return None
+        try:
+            relation = first.relation
+            for other in frames[1:]:
+                relation = relation.union(other.relation)
+        except Exception:  # noqa: BLE001 — fall back to pd.concat
+            LOGGER.debug("Lazy concat failed; using pandas", exc_info=True)
+            return None
+        return DuckDBLazyFrame(relation, self._conn, backend=self)
+
+    def distinct(self, frame: Any) -> Any:
+        """Remove duplicate rows via DuckDB, staying lazy when possible."""
+        if _is_lazy(frame):
+            try:
+                return DuckDBLazyFrame(
+                    frame.relation.distinct(), self._conn, backend=self
+                )
+            except Exception:  # noqa: BLE001 — fall back to eager DISTINCT
+                LOGGER.debug(
+                    "Lazy distinct failed; materialising", exc_info=True
+                )
+        return self._execute_sql(
+            "SELECT DISTINCT * FROM _distinct_input",
+            {"_distinct_input": frame},
+        )
+
+    def assign_column(
+        self,
+        frame: Any,
+        name: str,
+        values: Any,
+    ) -> pd.DataFrame:
+        """Add or replace a column — delegates to pandas."""
+        return _to_df(frame).assign(**{name: values})
+
+    def drop_columns(
+        self,
+        frame: Any,
+        columns: list[str],
+    ) -> pd.DataFrame:
+        """Drop columns, ignoring missing names."""
+        df = _to_df(frame)
+        existing = [c for c in columns if c in df.columns]
+        if not existing:
+            return df
+        return df.drop(columns=existing)
+
+    # ------------------------------------------------------------------
+    # Aggregate
+    # ------------------------------------------------------------------
+
+    def aggregate(
+        self,
+        frame: Any,
+        group_cols: list[str],
+        agg_specs: dict[str, tuple[str, str]],
+    ) -> pd.DataFrame:
+        """Aggregation via DuckDB SQL."""
+        agg_exprs = []
+        for out_col, (src_col, func) in agg_specs.items():
+            sql_func = _pandas_agg_to_sql(func)
+            validate_identifier(src_col)
+            validate_identifier(out_col)
+            agg_exprs.append(f'{sql_func}("{src_col}") AS "{out_col}"')
+
+        if group_cols:
+            for col in group_cols:
+                validate_identifier(col)
+            group_clause = ", ".join(f'"{c}"' for c in group_cols)
+            select = f"{group_clause}, {', '.join(agg_exprs)}"
+            sql = f"SELECT {select} FROM _agg_input GROUP BY {group_clause}"  # nosec B608 — cols validated by validate_identifier
+        else:
+            sql = f"SELECT {', '.join(agg_exprs)} FROM _agg_input"  # nosec B608 — cols validated by validate_identifier
+
+        return self._execute_sql(sql, {"_agg_input": frame})
+
+    # ------------------------------------------------------------------
+    # Order
+    # ------------------------------------------------------------------
+
+    def sort(
+        self,
+        frame: Any,
+        by: list[str],
+        ascending: list[bool] | None = None,
+    ) -> DuckDBLazyFrame:
+        """Sort via DuckDB — returns lazy for sort+limit fusion.
+
+        Returns a ``DuckDBLazyFrame`` so that a subsequent ``limit()``
+        can compose ORDER BY + LIMIT into a single DuckDB query instead
+        of materialising the full sort result first.
+
+        The ``DuckDBLazyFrame`` auto-materialises when accessed via pandas
+        methods, so callers that don't chain ``limit()`` still get correct
+        results transparently.
+        """
+        if ascending is None:
+            ascending = [True] * len(by)
+
+        vn = self._next_view("_sort")
+        order_clauses = []
+        for col, asc in zip(by, ascending, strict=True):
+            validate_identifier(col)
+            direction = "ASC" if asc else "DESC"
+            order_clauses.append(f'"{col}" {direction}')
+
+        sql = (
+            f'SELECT * FROM "{vn}" '  # nosec B608 — cols validated
+            f"ORDER BY {', '.join(order_clauses)}"
+        )
+        self._conn.register(vn, _to_df(frame))
+        relation = self._conn.sql(sql)
+        return DuckDBLazyFrame(relation, self._conn, backend=self)
+
+    def limit(self, frame: Any, n: int) -> pd.DataFrame:
+        """Limit via DuckDB.
+
+        When *frame* is a ``DuckDBLazyFrame`` (e.g. from ``sort()``),
+        the LIMIT is composed into the existing DuckDB relation,
+        enabling ORDER BY + LIMIT fusion.
+        """
+        if not isinstance(n, int) or n < 0:
+            msg = f"limit n must be a non-negative integer, got {n!r}"
+            raise ValueError(msg)
+        if _is_lazy(frame):
+            return frame.relation.limit(n).fetchdf()
+        return self._execute_sql(
+            "SELECT * FROM _limit_input LIMIT $1",
+            {"_limit_input": frame},
+            params=[n],
+        )
+
+    def skip(self, frame: Any, n: int) -> pd.DataFrame:
+        """Skip first *n* rows via DuckDB."""
+        if not isinstance(n, int) or n < 0:
+            msg = f"skip n must be a non-negative integer, got {n!r}"
+            raise ValueError(msg)
+        return self._execute_sql(
+            "SELECT * FROM _skip_input OFFSET $1",
+            {"_skip_input": _to_df(frame)},
+            params=[n],
+        )
+
+    # ------------------------------------------------------------------
+    # Materialise / inspect
+    # ------------------------------------------------------------------
+
+    def to_pandas(self, frame: Any) -> pd.DataFrame:
+        """Materialise — executes the DuckDB query DAG if lazy."""
+        if _is_lazy(frame):
+            return frame.to_pandas()
+        if isinstance(frame, pd.DataFrame):
+            return frame
+        return _to_pandas(frame)
+
+    def row_count(self, frame: Any) -> int:
+        """Row count — uses DuckDB COUNT(*) for lazy frames."""
+        return len(frame)
+
+    def is_empty(self, frame: Any) -> bool:
+        """Check if frame has zero rows."""
+        return len(frame) == 0
+
+    def memory_estimate_bytes(self, frame: Any) -> int:
+        """Estimate memory usage."""
+        return int(_to_df(frame).memory_usage(deep=True).sum())

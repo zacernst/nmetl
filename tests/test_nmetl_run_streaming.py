@@ -1,0 +1,268 @@
+"""Phase 5b (out-of-core DuckDB) — nmetl run streaming integration.
+
+Verifies the run_impl streaming fast path: with the relation engine enabled and
+a duckdb backend, an all-eligible pipeline streams each query file->sink via
+DuckDB (out-of-core); ineligible pipelines and the disabled default fall back to
+the normal in-memory path unchanged.
+
+See docs/duckdb_full_parity_design.md.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pandas as pd
+from click.testing import CliRunner
+from pycypher.nmetl_cli import cli
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+
+def _write_people(tmp_path: Path) -> Path:
+    src = tmp_path / "people.parquet"
+    pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Carol"],
+            "age": [30, 25, 35],
+        },
+    ).to_parquet(src)
+    return src
+
+
+def _config(
+    tmp_path: Path,
+    out: Path,
+    query: str,
+    *,
+    relation_engine: bool = False,
+) -> Path:
+    src = _write_people(tmp_path)
+    cfg = tmp_path / "pipeline.yaml"
+    relation_engine_line = (
+        f"relation_engine: {str(relation_engine).lower()}\n"
+        if relation_engine
+        else ""
+    )
+    cfg.write_text(
+        f"""\
+version: "1.0"
+backend_engine: duckdb
+{relation_engine_line}sources:
+  entities:
+    - id: people_src
+      uri: "{src}"
+      entity_type: Person
+      id_col: id
+queries:
+  - id: q1
+    inline: "{query}"
+output:
+  - query_id: q1
+    uri: "{out}"
+    format: parquet
+""",
+    )
+    return cfg
+
+
+class TestStreamingRun:
+    def test_eligible_pipeline_streams(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PYCYPHER_DUCKDB_RELATION_ENGINE", "1")
+        out = tmp_path / "out.parquet"
+        cfg = _config(
+            tmp_path,
+            out,
+            "MATCH (n:Person) RETURN n.name AS name, n.age AS age",
+        )
+
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "out-of-core" in result.output  # took the streaming path
+        got = pd.read_parquet(out).sort_values("name").reset_index(drop=True)
+        assert got["name"].tolist() == ["Alice", "Bob", "Carol"]
+        assert set(got.columns) == {"name", "age"}
+
+    def test_relation_engine_enabled_via_config(self, tmp_path: Path) -> None:
+        # No env var — `relation_engine: true` in the YAML alone must enable
+        # the streaming path.
+        out = tmp_path / "out.parquet"
+        cfg = _config(
+            tmp_path,
+            out,
+            "MATCH (n:Person) RETURN n.name AS name, n.age AS age",
+            relation_engine=True,
+        )
+
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "out-of-core" in result.output
+        got = pd.read_parquet(out).sort_values("name").reset_index(drop=True)
+        assert got["name"].tolist() == ["Alice", "Bob", "Carol"]
+
+
+def _config_multi(
+    tmp_path: Path,
+    out: Path,
+    queries: list[tuple[str, str]],
+) -> Path:
+    """Build a pipeline config from *queries* (a list of ``(id, inline)``
+    pairs); only the last query gets an output sink, to *out*.
+    """
+    src = _write_people(tmp_path)
+    cfg = tmp_path / "pipeline.yaml"
+    queries_yaml = "\n".join(
+        f'  - id: {qid}\n    inline: "{text}"' for qid, text in queries
+    )
+    last_id = queries[-1][0]
+    cfg.write_text(
+        f"""\
+version: "1.0"
+backend_engine: duckdb
+relation_engine: true
+sources:
+  entities:
+    - id: people_src
+      uri: "{src}"
+      entity_type: Person
+      id_col: id
+queries:
+{queries_yaml}
+output:
+  - query_id: {last_id}
+    uri: "{out}"
+    format: parquet
+""",
+    )
+    return cfg
+
+
+class TestMutationInterleavedWithRead:
+    """A no-sink SET/CREATE/DELETE mutation ahead of a read+sink query still
+    takes the streaming path, and the sink reflects the mutation.
+    """
+
+    def test_set_then_read_streams(self, tmp_path: Path) -> None:
+        out = tmp_path / "out.parquet"
+        cfg = _config_multi(
+            tmp_path,
+            out,
+            [
+                ("q1", "MATCH (n:Person) WHERE n.age > 28 SET n.age = 99"),
+                ("q2", "MATCH (n:Person) RETURN n.name AS name, n.age AS age"),
+            ],
+        )
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "out-of-core" in result.output
+        got = pd.read_parquet(out).sort_values("name").reset_index(drop=True)
+        expected = {"Alice": 99, "Bob": 25, "Carol": 99}
+        assert dict(zip(got["name"], got["age"])) == expected
+
+    def test_create_then_delete_then_read_streams(
+        self, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "out.parquet"
+        cfg = _config_multi(
+            tmp_path,
+            out,
+            [
+                ("q1", "CREATE (n:Person {name: 'Dave', age: 40})"),
+                ("q2", "MATCH (n:Person) WHERE n.name = 'Bob' DELETE n"),
+                ("q3", "MATCH (n:Person) RETURN n.name AS name, n.age AS age"),
+            ],
+        )
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "out-of-core" in result.output
+        got = pd.read_parquet(out).sort_values("name").reset_index(drop=True)
+        assert got["name"].tolist() == ["Alice", "Carol", "Dave"]
+        assert dict(zip(got["name"], got["age"]))["Dave"] == 40
+
+
+class TestCrossQuerySequencing:
+    """Phase 3b (docs/fastopendata_streaming_qualification_plan.md) -- a
+    query reading a property that an *earlier* query's SET creates fresh
+    (not present in the raw source at all) still streams, because the
+    earlier mutation executes before the later query's own eligibility is
+    checked, not only at final execution time.
+    """
+
+    def test_read_of_earlier_set_created_column_streams(
+        self, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "out.parquet"
+        cfg = _config_multi(
+            tmp_path,
+            out,
+            [
+                (
+                    "q1",
+                    "MATCH (n:Person) WHERE n.age > 28 SET n.tier = 'senior'",
+                ),
+                (
+                    "q2",
+                    (
+                        "MATCH (n:Person) WHERE n.tier = 'senior' "
+                        "RETURN n.name AS name"
+                    ),
+                ),
+            ],
+        )
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "out-of-core" in result.output
+        got = pd.read_parquet(out)
+        assert sorted(got["name"].tolist()) == ["Alice", "Carol"]
+
+
+class TestFallback:
+    def test_ineligible_pipeline_falls_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("PYCYPHER_DUCKDB_RELATION_ENGINE", "1")
+        out = tmp_path / "out.parquet"
+        # SKIP without LIMIT is ineligible (WHERE/ORDER BY alone would now be
+        # eligible) => normal in-memory path; ORDER BY keeps it deterministic.
+        cfg = _config(
+            tmp_path,
+            out,
+            "MATCH (n:Person) RETURN n.name AS name ORDER BY name SKIP 2",
+        )
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        # Did not stream (the success marker is absent) but the fallback is
+        # now a visible, specific warning rather than silent — see
+        # docs/fastopendata_streaming_qualification_plan.md, "Phase 0".
+        assert "query/queries (out-of-core)" not in result.output
+        assert "did not qualify for out-of-core streaming" in result.output
+        assert "q1" in result.output
+        got = pd.read_parquet(out)
+        assert got["name"].tolist() == ["Carol"]
+
+    def test_disabled_by_default_uses_normal_path(
+        self, tmp_path: Path
+    ) -> None:
+        # No env flag => streaming never attempted => normal path, correct output.
+        out = tmp_path / "out.parquet"
+        cfg = _config(
+            tmp_path,
+            out,
+            "MATCH (n:Person) RETURN n.name AS name, n.age AS age",
+        )
+        result = CliRunner().invoke(cli, ["run", str(cfg)])
+        assert result.exit_code == 0, result.output
+        assert "query/queries (out-of-core)" not in result.output
+        # backend_engine: duckdb is set (by _config) but relation_engine is
+        # not, so this is a real (if expected) fallback and should warn —
+        # not the silent "streaming never requested" case.
+        assert "did not qualify for out-of-core streaming" in result.output
+        assert "relation engine is not enabled" in result.output
+        got = pd.read_parquet(out)
+        assert sorted(got["name"].tolist()) == ["Alice", "Bob", "Carol"]
