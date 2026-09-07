@@ -637,7 +637,7 @@ class ASTConverter:
                 elif hasattr(limit_val, "value"):
                     try:
                         limit_val = int(limit_val.value)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         # Not a plain integer — convert to AST expression node
                         limit_val = self.convert(limit_clause.get("value"))
                 elif isinstance(limit_val, dict):
@@ -646,7 +646,7 @@ class ASTConverter:
                 else:
                     try:
                         limit_val = int(str(limit_val))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         limit_val = None
 
         # Extract skip value — same int-or-expression logic.
@@ -660,14 +660,14 @@ class ASTConverter:
                 elif hasattr(skip_val, "value"):
                     try:
                         skip_val = int(skip_val.value)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         skip_val = self.convert(skip_clause.get("value"))
                 elif isinstance(skip_val, dict):
                     skip_val = self.convert(skip_val)
                 else:
                     try:
                         skip_val = int(str(skip_val))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         skip_val = None
 
         return Return(
@@ -741,14 +741,14 @@ class ASTConverter:
                 elif hasattr(raw, "value"):
                     try:
                         skip_val = int(raw.value)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         skip_val = self.convert(skip_clause.get("value"))
                 elif isinstance(raw, dict):
                     skip_val = self.convert(raw)
                 else:
                     try:
                         skip_val = int(str(raw))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         skip_val = None
 
         # Extract LIMIT value — same int-or-expression logic.
@@ -768,14 +768,14 @@ class ASTConverter:
                 elif hasattr(raw, "value"):
                     try:
                         limit_val = int(raw.value)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         limit_val = self.convert(limit_clause.get("value"))
                 elif isinstance(raw, dict):
                     limit_val = self.convert(raw)
                 else:
                     try:
                         limit_val = int(str(raw))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         limit_val = None
 
         return With(

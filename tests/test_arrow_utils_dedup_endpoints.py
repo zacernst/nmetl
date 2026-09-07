@@ -1,6 +1,6 @@
 """Endpoint dedup stays exactly as it was, minus pandas.
 
-Phase 1 of ``docs/fastopendata_pandas_free_design.md``.  ``_dedup_endpoints``
+Phase 1 of the FastOpenData pandas-free design (private repository).  ``_dedup_endpoints``
 was the one place a fully-migrated fastopendata would still reach pandas,
 via ``ContextBuilder.add_relationship``: it converted both key columns with
 ``to_pandas()`` purely to call ``DataFrame.duplicated``.
@@ -54,9 +54,7 @@ def _pandas_expectation(pairs: list[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
         },
         dtype=object,
     )
-    kept = frame[
-        ~frame.duplicated(subset=["__SOURCE__", "__TARGET__"], keep="first")
-    ]
+    kept = frame[~frame.duplicated(subset=["__SOURCE__", "__TARGET__"], keep="first")]
     return list(zip(kept["__SOURCE__"], kept["__TARGET__"], strict=True))
 
 
@@ -64,12 +62,8 @@ def _actual(pairs: list[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
     """Return the surviving pairs according to the Arrow implementation."""
     table = pa.table(
         {
-            "__SOURCE__": pa.array(
-                [source for source, _ in pairs], type=pa.string()
-            ),
-            "__TARGET__": pa.array(
-                [target for _, target in pairs], type=pa.string()
-            ),
+            "__SOURCE__": pa.array([source for source, _ in pairs], type=pa.string()),
+            "__TARGET__": pa.array([target for _, target in pairs], type=pa.string()),
         },
     )
     result = _dedup_endpoints(table)

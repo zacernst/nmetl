@@ -100,10 +100,7 @@ class TestGCPressureResilience:
         ctx = ContextBuilder.from_dict(
             {
                 "Person": pd.DataFrame(
-                    {
-                        "__ID__": list(range(100)),
-                        "name": [f"P{i}" for i in range(100)],
-                    },
+                    {"__ID__": list(range(100)), "name": [f"P{i}" for i in range(100)]},
                 ),
             },
         )

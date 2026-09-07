@@ -142,7 +142,7 @@ class ClauseExecutor:
                 .fillna(False)
             )
             return result_frame.filter(_mask)
-        except ValueError, KeyError:
+        except (ValueError, KeyError):
             LOGGER.debug(
                 "WHERE: evaluation failed on result frame, falling back to pre-projection frame",
             )
@@ -325,7 +325,7 @@ class ClauseExecutor:
             return "(none)"
         try:
             return str(len(frame))
-        except AttributeError, TypeError:
+        except (AttributeError, TypeError):
             return "(unknown)"
 
     # ------------------------------------------------------------------
@@ -570,7 +570,9 @@ class ClauseExecutor:
                 # var_names, not bindings.columns: listing the columns must
                 # not materialise a lazy frame — carrying less data is the
                 # whole point of dropping them.
-                _dead_cols = [c for c in result.var_names if not _is_live(c)]
+                _dead_cols = [
+                    c for c in result.var_names if not _is_live(c)
+                ]
                 if _dead_cols:
                     LOGGER.debug(
                         "dead column elimination after %s: dropping %s",

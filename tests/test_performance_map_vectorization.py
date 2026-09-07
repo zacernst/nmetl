@@ -181,9 +181,7 @@ class TestMapLiteralPerformanceBaseline:
         print(f"1-key map literal (500 rows): {elapsed:.3f}s")
 
         # Single key should be reasonable even with current implementation
-        assert elapsed < perf_threshold(5.0), (
-            f"1-key map took {elapsed:.3f}s (threshold 5s)"
-        )
+        assert elapsed < perf_threshold(5.0), f"1-key map took {elapsed:.3f}s (threshold 5s)"
 
     def test_current_performance_5_keys(self, performance_star: Star) -> None:
         """Measure baseline performance with 5 keys."""

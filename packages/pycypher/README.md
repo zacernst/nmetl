@@ -31,29 +31,24 @@ import pandas as pd
 from pycypher import ContextBuilder, Star
 
 # 1. Create data as DataFrames (use __ID__ for node identity)
-people = pd.DataFrame(
-    {
-        "__ID__": [1, 2],
-        "name": ["Alice", "Bob"],
-        "age": [30, 25],
-    }
-)
+people = pd.DataFrame({
+    "__ID__": [1, 2],
+    "name": ["Alice", "Bob"],
+    "age": [30, 25],
+})
 
-knows = pd.DataFrame(
-    {
-        "__ID__": [1],
-        "__SOURCE__": [1],  # Alice
-        "__TARGET__": [2],  # Bob
-    }
-)
+knows = pd.DataFrame({
+    "__ID__": [1],
+    "__SOURCE__": [1],  # Alice
+    "__TARGET__": [2],  # Bob
+})
 
 # 2. Build a graph context
 context = (
     ContextBuilder()
     .add_entity("Person", people)
-    .add_relationship(
-        "KNOWS", knows, source_col="__SOURCE__", target_col="__TARGET__"
-    )
+    .add_relationship("KNOWS", knows,
+                      source_col="__SOURCE__", target_col="__TARGET__")
     .build()
 )
 
@@ -82,10 +77,10 @@ from pycypher import Star, VariableNotFoundError, UnsupportedFunctionError
 try:
     result = star.execute_query("MATCH (n:Person) RETURN m.name")
 except VariableNotFoundError as e:
-    print(e.variable_name)  # "m"
-    print(e.available_variables)  # ["n"]
+    print(e.variable_name)        # "m"
+    print(e.available_variables)   # ["n"]
 except UnsupportedFunctionError as e:
-    print(e.supported_functions)  # list of valid function names
+    print(e.supported_functions)   # list of valid function names
 ```
 
 See the module docstring (`help(pycypher)`) for the full exception hierarchy.
@@ -97,9 +92,7 @@ Configure via environment variables or presets:
 ```python
 from pycypher import apply_preset
 
-apply_preset(
-    "production"
-)  # 30s timeout, 100K cross-join ceiling, rate limiting
+apply_preset("production")   # 30s timeout, 100K cross-join ceiling, rate limiting
 apply_preset("development")  # No timeouts, generous limits (default)
 ```
 
@@ -120,19 +113,16 @@ Key environment variables:
 - **131+ scalar functions** — string, math, temporal, list, and type conversion
 - **Query optimization** — cardinality estimation, join reordering, filter pushdown
 - **Pre-execution validation** — `validate_query()` catches errors before execution
-- **CLI tools** — `nmetl` command for pipelines, REPL, health monitoring, and metrics
+- **Ingestion layer** — `ContextBuilder`, file/SQL/DataFrame data sources, and result writers
 
 ## CLI
 
+The `nmetl` command (YAML pipelines, REPL, health monitoring, metrics) is
+provided by the separate [`nmetl`](../nmetl/README.md) package, which depends
+on pycypher. pycypher itself ships no console scripts.
+
 ```bash
-# Interactive REPL
-nmetl repl
-
-# Run a YAML-defined ETL pipeline
-nmetl run pipeline.yaml
-
-# View query metrics
-nmetl metrics --diagnostic
+uv run nmetl run pipeline.yaml
 ```
 
 ## Examples

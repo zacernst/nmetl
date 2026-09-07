@@ -40,9 +40,7 @@ def _to_bytes(mem: str) -> float:
 
 
 class TestNoConfig:
-    def test_empty_config_when_nothing_set(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_empty_config_when_nothing_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         for var in (
             "PYCYPHER_DUCKDB_MEMORY_LIMIT",
             "PYCYPHER_DUCKDB_TEMP_DIRECTORY",
@@ -50,19 +48,14 @@ class TestNoConfig:
             "PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER",
         ):
             monkeypatch.delenv(var, raising=False)
-        assert (
-            _spill_config(
-                memory_limit=None,
-                temp_directory=None,
-                max_temp_directory_size=None,
-                preserve_insertion_order=None,
-            )
-            == {}
-        )
+        assert _spill_config(
+            memory_limit=None,
+            temp_directory=None,
+            max_temp_directory_size=None,
+            preserve_insertion_order=None,
+        ) == {}
 
-    def test_default_backend_still_works(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_default_backend_still_works(self, monkeypatch: pytest.MonkeyPatch) -> None:
         for var in (
             "PYCYPHER_DUCKDB_MEMORY_LIMIT",
             "PYCYPHER_DUCKDB_TEMP_DIRECTORY",
@@ -103,35 +96,27 @@ class TestExplicitConfig:
 
 
 class TestEnvFallback:
-    def test_env_var_used_when_arg_none(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_var_used_when_arg_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_MEMORY_LIMIT", "256MB")
         backend = DuckDBBackend()
         got = _to_bytes(str(_setting(backend, "memory_limit")))
         assert abs(got - 256e6) / 256e6 < 0.05
         backend.close()
 
-    def test_explicit_arg_overrides_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_explicit_arg_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_MEMORY_LIMIT", "256MB")
         backend = DuckDBBackend(memory_limit="512MB")
         got = _to_bytes(str(_setting(backend, "memory_limit")))
         assert abs(got - 512e6) / 512e6 < 0.05
         backend.close()
 
-    def test_preserve_insertion_order_env_parsed(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_preserve_insertion_order_env_parsed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER", "false")
         backend = DuckDBBackend()
         assert _setting(backend, "preserve_insertion_order") is False
         backend.close()
 
-    def test_invalid_bool_env_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_invalid_bool_env_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_PRESERVE_INSERTION_ORDER", "maybe")
         with pytest.raises(ValueError, match="Invalid boolean"):
             DuckDBBackend()

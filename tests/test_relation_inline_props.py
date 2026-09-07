@@ -65,26 +65,20 @@ def _assert_parity(query: str, sort_cols: list[str]) -> None:
 class TestEligibility:
     def test_inline_prop_eligible(self) -> None:
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person {dept: 'eng'}) RETURN n.name AS name"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person {dept: 'eng'}) RETURN n.name AS name"),
             _ctx("duckdb"),
         )
 
     def test_unknown_inline_prop_ineligible(self) -> None:
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person {nope: 'x'}) RETURN n.name AS name"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person {nope: 'x'}) RETURN n.name AS name"),
             _ctx("duckdb"),
         )
 
 
 class TestParity:
     def test_single_inline_prop(self) -> None:
-        _assert_parity(
-            "MATCH (n:Person {dept: 'eng'}) RETURN n.name AS name", ["name"]
-        )
+        _assert_parity("MATCH (n:Person {dept: 'eng'}) RETURN n.name AS name", ["name"])
 
     def test_multiple_inline_props(self) -> None:
         _assert_parity(

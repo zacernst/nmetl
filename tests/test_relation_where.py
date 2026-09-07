@@ -35,9 +35,7 @@ def _ctx(backend: str) -> Context:
         },
     )
     return Context(
-        entity_mapping=EntityMapping(
-            mapping={"Person": EntityTable.from_dataframe("Person", people)}
-        ),
+        entity_mapping=EntityMapping(mapping={"Person": EntityTable.from_dataframe("Person", people)}),
         relationship_mapping=RelationshipMapping(mapping={}),
         backend=backend,
     )
@@ -72,24 +70,16 @@ def _resolve(attr: dict[str, str]):
 class TestCompiler:
     def test_supported_predicate_compiles(self) -> None:
         attr = {"age": "age", "name": "name"}
-        where = (
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) WHERE n.age >= 30 AND n.name <> 'Bob' RETURN n.age AS a",
-            )
-            .clauses[0]
-            .where
-        )
+        where = ASTConverter.from_cypher(
+            "MATCH (n:Person) WHERE n.age >= 30 AND n.name <> 'Bob' RETURN n.age AS a",
+        ).clauses[0].where
         assert compile_expression(where, _resolve(attr)) is not None
 
     def test_unsupported_function_returns_none(self) -> None:
         attr = {"name": "name"}
-        where = (
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) WHERE upper(n.name) = 'ALICE' RETURN n.name AS x",
-            )
-            .clauses[0]
-            .where
-        )
+        where = ASTConverter.from_cypher(
+            "MATCH (n:Person) WHERE upper(n.name) = 'ALICE' RETURN n.name AS x",
+        ).clauses[0].where
         assert compile_expression(where, _resolve(attr)) is None
 
 
@@ -97,18 +87,14 @@ class TestEligibility:
     def test_where_eligible(self) -> None:
         ctx = _ctx("duckdb")
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) WHERE n.age > 28 RETURN n.name AS name"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) WHERE n.age > 28 RETURN n.name AS name"),
             ctx,
         )
 
     def test_where_with_function_ineligible(self) -> None:
         ctx = _ctx("duckdb")
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) WHERE upper(n.name) = 'A' RETURN n.name AS name"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) WHERE upper(n.name) = 'A' RETURN n.name AS name"),
             ctx,
         )
 
@@ -131,8 +117,6 @@ class TestParity:
     def test_null_comparison_semantics(self) -> None:
         # Dave has NULL age; `age > 0` must exclude him in BOTH engines
         # (SQL/Cypher three-valued logic: NULL > 0 is unknown → excluded).
-        oracle, got = _both(
-            "MATCH (n:Person) WHERE n.age > 0 RETURN n.name AS name"
-        )
+        oracle, got = _both("MATCH (n:Person) WHERE n.age > 0 RETURN n.name AS name")
         assert "Dave" not in oracle["name"].tolist()
         assert sorted(got["name"].tolist()) == sorted(oracle["name"].tolist())

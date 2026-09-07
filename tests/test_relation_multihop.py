@@ -52,9 +52,7 @@ def _ctx(backend: str) -> Context:
     )
     return Context(
         entity_mapping=EntityMapping(mapping={"Person": person}),
-        relationship_mapping=RelationshipMapping(
-            mapping={"KNOWS": knows_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"KNOWS": knows_table}),
         backend=backend,
     )
 

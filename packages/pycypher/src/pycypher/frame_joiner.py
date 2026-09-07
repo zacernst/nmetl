@@ -209,7 +209,7 @@ class FrameJoiner:
                 clause,
                 context_frame=current_frame,
             )
-        except ValueError, KeyError:
+        except (ValueError, KeyError):
             # GraphTypeNotFoundError (ValueError subclass) is the expected
             # failure when an OPTIONAL MATCH references a label/type absent
             # from the context.  KeyError can surface from missing columns

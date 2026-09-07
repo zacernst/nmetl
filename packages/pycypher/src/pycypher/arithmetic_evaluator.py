@@ -200,7 +200,7 @@ def _first_non_null_val(series: FrameSeries) -> Any:
         try:
             if v != v:  # NaN != NaN
                 continue
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass  # pd.NA raises TypeError; treat as null
         else:
             return v

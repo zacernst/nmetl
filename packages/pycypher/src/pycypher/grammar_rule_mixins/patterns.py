@@ -423,7 +423,7 @@ class PatternRulesMixin:
             # Fallback: attempt to coerce to int for fixed length strings/tokens
             try:
                 value = int(str(range_spec))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 value = None
             length_node["min"] = value
             length_node["max"] = value

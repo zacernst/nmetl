@@ -62,7 +62,7 @@ def _parse_slow_query_ms() -> float:
     raw = os.environ.get("PYCYPHER_SLOW_QUERY_MS", "1000")
     try:
         val = int(raw)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         _logger.warning(
             "Invalid PYCYPHER_SLOW_QUERY_MS=%r, using default 1000ms",
             raw,
@@ -100,7 +100,7 @@ def get_rss_mb() -> float:
     try:
         usage = resource.getrusage(resource.RUSAGE_SELF)
         return usage.ru_maxrss / _RUSAGE_DIVISOR
-    except AttributeError, OSError:
+    except (AttributeError, OSError):
         return 0.0
 
 

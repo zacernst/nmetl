@@ -34,7 +34,7 @@ class TestYAMLSafety:
     def test_yaml_safe_load_used(self) -> None:
         """Config loader must use yaml.safe_load, never yaml.load."""
         config_path = Path(
-            "packages/pycypher/src/pycypher/ingestion/config.py",
+            "packages/nmetl/src/nmetl/config.py",
         )
         source = config_path.read_text()
         assert "yaml.safe_load" in source
@@ -193,21 +193,21 @@ class TestNeo4jSinkSecurity:
 
     def test_password_not_in_repr(self) -> None:
         """Neo4j sink repr/str must not contain the password."""
-        neo4j_path = Path("packages/pycypher/src/pycypher/sinks/neo4j.py")
+        neo4j_path = Path("packages/nmetl/src/nmetl/sinks/neo4j.py")
         source = neo4j_path.read_text()
         # Verify password masking exists in __repr__
         assert "__repr__" in source or "repr" in source.lower()
 
     def test_cypher_templates_use_parameters(self) -> None:
         """Neo4j Cypher templates must use $rows parameters, not interpolation."""
-        neo4j_path = Path("packages/pycypher/src/pycypher/sinks/neo4j.py")
+        neo4j_path = Path("packages/nmetl/src/nmetl/sinks/neo4j.py")
         source = neo4j_path.read_text()
         # Verify parameterized execution pattern
         assert "rows=rows" in source or "$rows" in source
 
     def test_identifiers_are_backtick_quoted(self) -> None:
         """Neo4j Cypher templates must backtick-quote identifiers."""
-        neo4j_path = Path("packages/pycypher/src/pycypher/sinks/neo4j.py")
+        neo4j_path = Path("packages/nmetl/src/nmetl/sinks/neo4j.py")
         source = neo4j_path.read_text()
         # Check for backtick quoting pattern in template builders
         assert "``{" in source or "`{" in source
@@ -224,7 +224,7 @@ class TestImportBlocklist:
     def test_blocklist_contains_dangerous_modules(self) -> None:
         """Import blocklist includes os, subprocess, pickle, etc."""
         config_path = Path(
-            "packages/pycypher/src/pycypher/ingestion/config.py",
+            "packages/nmetl/src/nmetl/config.py",
         )
         source = config_path.read_text()
         dangerous = ["os", "subprocess", "pickle", "shutil", "tempfile"]

@@ -16,13 +16,11 @@ from pycypher import ContextBuilder, Star
 
 # ── Level 1: Your First Query (3 lines of setup) ─────────────────────
 
-people = pd.DataFrame(
-    {
-        "__ID__": [1, 2, 3],
-        "name": ["Alice", "Bob", "Carol"],
-        "age": [30, 25, 35],
-    }
-)
+people = pd.DataFrame({
+    "__ID__": [1, 2, 3],
+    "name": ["Alice", "Bob", "Carol"],
+    "age": [30, 25, 35],
+})
 
 context = ContextBuilder.from_dict({"Person": people})
 star = Star(context=context)
@@ -52,20 +50,16 @@ print(result.to_string(index=False))
 
 # ── Level 3: Multiple Entity Types ───────────────────────────────────
 
-products = pd.DataFrame(
-    {
-        "__ID__": [10, 20, 30],
-        "title": ["Widget", "Gadget", "Gizmo"],
-        "price": [9.99, 49.99, 24.99],
-    }
-)
+products = pd.DataFrame({
+    "__ID__": [10, 20, 30],
+    "title": ["Widget", "Gadget", "Gizmo"],
+    "price": [9.99, 49.99, 24.99],
+})
 
-context = ContextBuilder.from_dict(
-    {
-        "Person": people,
-        "Product": products,
-    }
-)
+context = ContextBuilder.from_dict({
+    "Person": people,
+    "Product": products,
+})
 star = Star(context=context)
 
 result = star.execute_query(
@@ -81,24 +75,20 @@ print(result.to_string(index=False))
 
 # ── Level 4: Relationships ────────────────────────────────────────────
 
-purchases = pd.DataFrame(
-    {
-        "__ID__": [100, 101, 102],
-        "__SOURCE__": [1, 2, 1],  # Person IDs
-        "__TARGET__": [10, 20, 30],  # Product IDs
-        "date": ["2024-01", "2024-02", "2024-03"],
-    }
-)
+purchases = pd.DataFrame({
+    "__ID__": [100, 101, 102],
+    "__SOURCE__": [1, 2, 1],    # Person IDs
+    "__TARGET__": [10, 20, 30],  # Product IDs
+    "date": ["2024-01", "2024-02", "2024-03"],
+})
 
 context = (
     ContextBuilder()
     .add_entity("Person", people)
     .add_entity("Product", products)
     .add_relationship(
-        "BOUGHT",
-        purchases,
-        source_col="__SOURCE__",
-        target_col="__TARGET__",
+        "BOUGHT", purchases,
+        source_col="__SOURCE__", target_col="__TARGET__",
     )
     .build()
 )

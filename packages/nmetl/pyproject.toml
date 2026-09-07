@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nmetl"
+version = "0.0.1"
+description = "ETL pipeline runner and CLI for Cypher-based data transformations, built on PyCypher"
+readme = "README.md"
+requires-python = "==3.14.*"
+keywords = ["etl", "cypher", "pipeline", "cli", "duckdb"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.14",
+]
+# nmetl is the ETL layer on top of the pycypher query engine. It owns the
+# YAML pipeline configuration, config validation, the `nmetl` CLI, the REPL,
+# the health server, and the Neo4j sink. pycypher must never import nmetl.
+dependencies = [
+  "pycypher",
+  "shared",
+  "click>=8.3.3,<9.0.0",
+  "pyyaml>=6.0.0,<7.0.0",
+  "pydantic>=2.13.4,<3.0.0",
+  "lark>=1.3.1,<2.0.0",
+  "pandas>=3.0.0,<4.0.0",
+  "pyarrow>=18.0.0,<25.0.0",
+  "duckdb>=1.5.2,<2.0.0",
+  "numpy>=2.0.0,<3.0.0",
+]
+
+[[project.authors]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[[project.maintainers]]
+name = "Zachary Ernst"
+email = "zac.ernst@gmail.com"
+
+[project.license]
+file = "LICENSE.txt"
+
+[project.optional-dependencies]
+neo4j = ["neo4j>=5.0.0,<7.0.0"]
+cloud = ["s3fs>=2025.1.0,<2027.0.0", "gcsfs>=2025.1.0,<2027.0.0"]
+all = ["nmetl[neo4j,cloud]"]
+
+[project.urls]
+Homepage = "https://github.com/zacernst/pycypher-nmetl"
+
+[project.scripts]
+nmetl = "nmetl.nmetl_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nmetl"]

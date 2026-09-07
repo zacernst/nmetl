@@ -133,9 +133,10 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_no_streaming_source(self) -> None:
+    def test_eligible_in_memory_source_is_materialised(self) -> None:
+        # Plan catalog: an in-memory-only label is materialised into a registry table on first use, so it is writable.
         ctx = _entity_ctx()
-        assert not is_relation_set_eligible(
+        assert is_relation_set_eligible(
             _ast("MATCH (p:Person) SET p.status = 'senior'"),
             ctx,
         )
@@ -190,7 +191,7 @@ class TestExecution:
 
 
 class TestNewColumn:
-    """Phase 3a (docs/fastopendata_streaming_qualification_plan.md) -- a
+    """Phase 3a (the FastOpenData streaming-qualification plan (private repository)) -- a
     SET target property that doesn't exist yet in the raw file is created
     via ALTER TABLE rather than making the whole query ineligible.
     """

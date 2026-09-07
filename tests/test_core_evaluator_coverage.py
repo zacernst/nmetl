@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
+from pycypher.binding_evaluator import BindingExpressionEvaluator
 from pycypher.arithmetic_evaluator import (
     ArithmeticExpressionEvaluator,
     _cypher_div,
@@ -26,7 +27,6 @@ from pycypher.arithmetic_evaluator import (
     _is_temporal_val,
     _temporal_arith_pair,
 )
-from pycypher.binding_evaluator import BindingExpressionEvaluator
 from pycypher.boolean_evaluator import (
     BooleanExpressionEvaluator,
     kleene_and,
@@ -321,9 +321,7 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_arithmetic_add(self) -> None:
         frame = _make_frame(3)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         left_s = pd.Series([1, 2, 3])
         right_s = pd.Series([10, 20, 30])
         mock_eval = _make_evaluator({"L": left_s, "R": right_s})
@@ -332,18 +330,14 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_arithmetic_unsupported_op(self) -> None:
         frame = _make_frame(1)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"L": pd.Series([1]), "R": pd.Series([2])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_arithmetic("@", "L", "R", mock_eval)
 
     def test_evaluate_arithmetic_type_error(self) -> None:
         frame = _make_frame(1)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {"L": pd.Series(["a"]), "R": pd.Series([1])},
         )
@@ -352,9 +346,7 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_comparison(self) -> None:
         frame = _make_frame(3)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         left_s = pd.Series([1, 2, 3])
         right_s = pd.Series([2, 2, 2])
         mock_eval = _make_evaluator({"L": left_s, "R": right_s})
@@ -363,9 +355,7 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_comparison_null_three_valued(self) -> None:
         frame = _make_frame(2)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         left_s = pd.Series([1, None], dtype=object)
         right_s = pd.Series([1, 2])
         mock_eval = _make_evaluator({"L": left_s, "R": right_s})
@@ -375,36 +365,28 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_comparison_unsupported_op(self) -> None:
         frame = _make_frame(1)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"L": pd.Series([1]), "R": pd.Series([2])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_comparison("!=", "L", "R", mock_eval)
 
     def test_evaluate_unary_neg(self) -> None:
         frame = _make_frame(3)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1, -2, 3])})
         result = ev.evaluate_unary("-", "X", mock_eval)
         assert list(result) == [-1, 2, -3]
 
     def test_evaluate_unary_pos(self) -> None:
         frame = _make_frame(2)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([5, -3])})
         result = ev.evaluate_unary("+", "X", mock_eval)
         assert list(result) == [5, -3]
 
     def test_evaluate_unary_null_propagation(self) -> None:
         frame = _make_frame(2)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1, None], dtype=object)})
         result = ev.evaluate_unary("-", "X", mock_eval)
         assert result.iloc[0] == -1
@@ -412,9 +394,7 @@ class TestArithmeticEvaluatorClass:
 
     def test_evaluate_unary_unsupported(self) -> None:
         frame = _make_frame(1)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_unary("~", "X", mock_eval)
@@ -422,9 +402,7 @@ class TestArithmeticEvaluatorClass:
     def test_evaluate_arithmetic_temporal(self) -> None:
         """Arithmetic dispatch detects temporal values and routes to temporal handler."""
         frame = _make_frame(1)
-        ev = ArithmeticExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ArithmeticExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "L": pd.Series(["2024-01-15"]),
@@ -536,9 +514,7 @@ class TestKleeneNot:
 class TestBooleanEvaluatorClass:
     def test_evaluate_and_all_true(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "a": pd.Series([True, True]),
@@ -551,17 +527,13 @@ class TestBooleanEvaluatorClass:
 
     def test_evaluate_and_empty(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ev.evaluate_and([], MagicMock())
         assert list(result) == [True, True]
 
     def test_evaluate_or(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "a": pd.Series([False, False]),
@@ -574,17 +546,13 @@ class TestBooleanEvaluatorClass:
 
     def test_evaluate_or_empty(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ev.evaluate_or([], MagicMock())
         assert list(result) == [False, False]
 
     def test_evaluate_not(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"x": pd.Series([True, False])})
         result = ev.evaluate_not("x", mock_eval)
         assert bool(result.iloc[0]) is False
@@ -592,9 +560,7 @@ class TestBooleanEvaluatorClass:
 
     def test_evaluate_xor(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "a": pd.Series([True, True]),
@@ -607,17 +573,13 @@ class TestBooleanEvaluatorClass:
 
     def test_evaluate_xor_empty(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ev.evaluate_xor([], MagicMock())
         assert list(result) == [False, False]
 
     def test_evaluate_bool_chain_and(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "a": pd.Series([True, True]),
@@ -630,17 +592,13 @@ class TestBooleanEvaluatorClass:
 
     def test_evaluate_bool_chain_unsupported(self) -> None:
         frame = _make_frame(1)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_bool_chain("nand", ["a"], MagicMock())
 
     def test_evaluate_bool_chain_empty(self) -> None:
         frame = _make_frame(2)
-        ev = BooleanExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = BooleanExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ev.evaluate_bool_chain("or", [], MagicMock())
         assert list(result) == [False, False]
 
@@ -653,9 +611,7 @@ class TestBooleanEvaluatorClass:
 class TestComparisonEvaluatorClass:
     def test_evaluate_comparison_eq(self) -> None:
         frame = _make_frame(3)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "L": pd.Series([1, 2, 3]),
@@ -667,9 +623,7 @@ class TestComparisonEvaluatorClass:
 
     def test_evaluate_comparison_null_propagation(self) -> None:
         frame = _make_frame(2)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {
                 "L": pd.Series([1, None], dtype=object),
@@ -681,18 +635,14 @@ class TestComparisonEvaluatorClass:
 
     def test_evaluate_comparison_unsupported_op(self) -> None:
         frame = _make_frame(1)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"L": pd.Series([1]), "R": pd.Series([2])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_comparison("!=", "L", "R", mock_eval)
 
     def test_evaluate_null_check_is_null(self) -> None:
         frame = _make_frame(3)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {"X": pd.Series([1, None, 3], dtype=object)},
         )
@@ -701,9 +651,7 @@ class TestComparisonEvaluatorClass:
 
     def test_evaluate_null_check_is_not_null(self) -> None:
         frame = _make_frame(3)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator(
             {"X": pd.Series([1, None, 3], dtype=object)},
         )
@@ -712,45 +660,35 @@ class TestComparisonEvaluatorClass:
 
     def test_evaluate_null_check_unsupported(self) -> None:
         frame = _make_frame(1)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_null_check("IS EMPTY", "X", mock_eval)
 
     def test_evaluate_unary_neg(self) -> None:
         frame = _make_frame(2)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([5, -3])})
         result = ev.evaluate_unary("-", "X", mock_eval)
         assert list(result) == [-5, 3]
 
     def test_evaluate_unary_pos(self) -> None:
         frame = _make_frame(2)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([5, -3])})
         result = ev.evaluate_unary("+", "X", mock_eval)
         assert list(result) == [5, -3]
 
     def test_evaluate_unary_null_propagation(self) -> None:
         frame = _make_frame(2)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1, None], dtype=object)})
         result = ev.evaluate_unary("-", "X", mock_eval)
         assert result.iloc[1] is None
 
     def test_evaluate_unary_unsupported(self) -> None:
         frame = _make_frame(1)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         mock_eval = _make_evaluator({"X": pd.Series([1])})
         with pytest.raises(UnsupportedOperatorError):
             ev.evaluate_unary("~", "X", mock_eval)
@@ -758,9 +696,7 @@ class TestComparisonEvaluatorClass:
     def test_evaluate_case_searched(self) -> None:
         """Searched CASE: CASE WHEN cond THEN val ELSE default END."""
         frame = _make_frame(3)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         cond_series = pd.Series([True, False, True])
         then_series = pd.Series(["yes", "yes", "yes"])
@@ -784,9 +720,7 @@ class TestComparisonEvaluatorClass:
     def test_evaluate_case_simple(self) -> None:
         """Simple CASE: CASE expr WHEN match THEN val END."""
         frame = _make_frame(3)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         disc_series = pd.Series([1, 2, 3])
         match_series = pd.Series([2, 2, 2])
@@ -808,9 +742,7 @@ class TestComparisonEvaluatorClass:
     def test_evaluate_case_no_else_yields_none(self) -> None:
         """CASE with no ELSE and no matching WHEN → null."""
         frame = _make_frame(2)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         cond_series = pd.Series([False, False])
         then_series = pd.Series(["x", "x"])
@@ -824,9 +756,7 @@ class TestComparisonEvaluatorClass:
     def test_evaluate_case_multiple_whens_first_wins(self) -> None:
         """First matching WHEN clause wins."""
         frame = _make_frame(1)
-        ev = ComparisonEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ev = ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         clause1 = SimpleNamespace(condition="c1", result="t1")
         clause2 = SimpleNamespace(condition="c2", result="t2")

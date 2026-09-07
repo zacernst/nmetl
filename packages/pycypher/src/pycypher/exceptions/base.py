@@ -97,7 +97,7 @@ def _detect_environment() -> str:
             ipy = get_ipython()
             if ipy is not None and "ZMQInteractiveShell" in type(ipy).__name__:
                 env = "jupyter"
-        except ImportError, NameError:
+        except (ImportError, NameError):
             pass
 
     if env == "plain":

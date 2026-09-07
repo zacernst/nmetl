@@ -335,9 +335,7 @@ class TestPropertyAdditionPerformanceScenarios:
         assert result["processed_count"].iloc[0] == 1000
 
         # Performance assertion - should complete in reasonable time
-        assert execution_time < perf_threshold(
-            10.0
-        )  # Should complete in under 10 seconds
+        assert execution_time < perf_threshold(10.0)  # Should complete in under 10 seconds
 
     def test_memory_efficiency_large_dataset(self, large_dataset_context):
         """Test memory efficiency with large datasets."""

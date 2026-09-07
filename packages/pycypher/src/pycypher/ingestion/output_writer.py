@@ -2,7 +2,7 @@
 
 :func:`write_dataframe_to_uri` is the single entry point: it accepts a
 ``pd.DataFrame``, a destination URI, and an optional explicit
-:class:`~pycypher.ingestion.config.OutputFormat`, then writes the file in the
+:class:`OutputFormat`, then writes the file in the
 appropriate format.
 
 Supported URI forms
@@ -19,6 +19,7 @@ Parent directories are created automatically when they do not exist.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -26,12 +27,29 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     import pandas as pd
 
-    from pycypher.ingestion.config import OutputFormat
-
 # URI schemes that DuckDB handles as remote storage (not local filesystem)
 _CLOUD_SCHEMES: frozenset[str] = frozenset(
     {"s3", "gs", "gcs", "abfss", "adl", "az", "http", "https"},
 )
+
+
+class OutputFormat(StrEnum):
+    """Explicit output serialisation format.
+
+    When absent, the format is inferred from the ``uri`` file extension.
+    Lives here (not in the nmetl pipeline config) because the engine's own
+    :meth:`~pycypher.star.Star.stream_query_to_uri` writes results too.
+
+    Attributes:
+        CSV: Comma-separated values.
+        PARQUET: Apache Parquet columnar format.
+        JSON: JSON (newline-delimited records).
+
+    """
+
+    CSV = "csv"
+    PARQUET = "parquet"
+    JSON = "json"
 
 
 def _resolve_output(
@@ -49,7 +67,6 @@ def _resolve_output(
         ValueError: If *fmt* is ``None`` and the extension is unrecognised.
 
     """
-    from pycypher.ingestion.config import OutputFormat
     from pycypher.ingestion.security import sanitize_file_path
 
     parsed = urlparse(uri)
@@ -111,7 +128,7 @@ def write_dataframe_to_uri(
         df: The :class:`pandas.DataFrame` to serialise.
         uri: Destination URI.  Bare paths and ``file://`` URIs are accepted.
             Cloud URIs raise :exc:`NotImplementedError`.
-        fmt: Explicit :class:`~pycypher.ingestion.config.OutputFormat`.
+        fmt: Explicit :class:`OutputFormat`.
             When ``None``, the format is inferred from the URI extension.
 
     Raises:
@@ -121,8 +138,6 @@ def write_dataframe_to_uri(
             ``.csv``, ``.parquet``, or ``.json``.
 
     """
-    from pycypher.ingestion.config import OutputFormat
-
     path, fmt = _resolve_output(uri, fmt)
 
     if fmt == OutputFormat.CSV:
@@ -161,7 +176,7 @@ def write_relation_to_uri(
             :meth:`DataSource.read_relation` or the DuckDB backend).
         uri: Destination URI.  Bare paths and ``file://`` URIs are accepted;
             cloud URIs raise :exc:`NotImplementedError`.
-        fmt: Explicit :class:`~pycypher.ingestion.config.OutputFormat`.
+        fmt: Explicit :class:`OutputFormat`.
             When ``None``, inferred from the URI extension.
 
     Raises:

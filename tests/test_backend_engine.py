@@ -318,9 +318,7 @@ class TestSortLimitFusion:
     ) -> None:
         """Sort + limit returns top N sorted rows."""
         sorted_frame = backend.sort(
-            sample_df,
-            by=["age"],
-            ascending=[True],
+            sample_df, by=["age"], ascending=[True],
         )
         result = backend.to_pandas(backend.limit(sorted_frame, 2))
         assert len(result) == 2
@@ -333,9 +331,7 @@ class TestSortLimitFusion:
     ) -> None:
         """Sort descending + limit returns top N sorted rows."""
         sorted_frame = backend.sort(
-            sample_df,
-            by=["age"],
-            ascending=[False],
+            sample_df, by=["age"], ascending=[False],
         )
         result = backend.to_pandas(backend.limit(sorted_frame, 3))
         assert len(result) == 3

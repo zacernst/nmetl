@@ -249,7 +249,7 @@ class MutationEngine:
             return 0
         try:
             return int(candidate)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             LOGGER.debug(
                 "Non-integer %s ID %r for %s; defaulting to 0",
                 source_label,

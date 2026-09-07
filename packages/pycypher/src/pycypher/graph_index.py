@@ -370,7 +370,7 @@ def _coerce_query_ids(
             return np.array([float(x) for x in query_ids], dtype=object)
         if isinstance(sample_sorted, str):
             return np.array([str(x) for x in query_ids], dtype=object)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
     return query_ids
 

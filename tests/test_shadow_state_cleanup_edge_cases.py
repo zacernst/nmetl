@@ -205,7 +205,7 @@ class TestUnionQueryAtomicity:
                 "UNION ALL "
                 "MATCH (z:Nonexistent) RETURN z.name AS name",
             )
-        except ValueError, KeyError:
+        except (ValueError, KeyError):
             pass  # Expected — Nonexistent label doesn't exist.
 
         # Context should be unchanged — no shadow leakage.

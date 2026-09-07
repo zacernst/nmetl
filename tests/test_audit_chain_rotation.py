@@ -214,9 +214,7 @@ class TestBackwardCompatibility:
 
     def test_append_returns_record(self):
         log = ChainedAuditLog()
-        rec = log.append(
-            "test", severity="warning", source="unit-test", extra="data"
-        )
+        rec = log.append("test", severity="warning", source="unit-test", extra="data")
         assert isinstance(rec, AuditRecord)
         assert rec.event == "test"
         assert rec.severity == "warning"

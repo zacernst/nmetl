@@ -92,25 +92,19 @@ class TestNextEntityIds:
 
     def test_ids_start_after_max_existing(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ids = engine.next_entity_ids("Person", 3)
         assert list(ids) == [4, 5, 6]
 
     def test_ids_for_new_entity_type_start_at_1(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ids = engine.next_entity_ids("Animal", 2)
         assert list(ids) == [1, 2]
 
     def test_ids_account_for_shadow_layer(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         # Seed shadow with higher IDs
         ctx._shadow["Person"] = pd.DataFrame({ID_COLUMN: [1, 2, 3, 10]})
         ids = engine.next_entity_ids("Person", 2)
@@ -128,9 +122,7 @@ class TestNextEntityIds:
             attribute_map={},
             source_obj=str_df,
         )
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ids = engine.next_entity_ids("Foo", 1)
         # Falls back to 0 and starts at 1
         assert list(ids) == [1]
@@ -141,25 +133,19 @@ class TestNextRelationshipIds:
 
     def test_ids_start_after_max_existing(self) -> None:
         ctx = _people_context(with_relationships=True)
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ids = engine.next_relationship_ids("KNOWS", 2)
         assert list(ids) == [102, 103]
 
     def test_ids_for_new_rel_type_start_at_1(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ids = engine.next_relationship_ids("LIKES", 3)
         assert list(ids) == [1, 2, 3]
 
     def test_ids_account_for_shadow_rels(self) -> None:
         ctx = _people_context(with_relationships=True)
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         ctx._shadow_rels["KNOWS"] = pd.DataFrame(
             {
                 ID_COLUMN: [100, 101, 200],
@@ -172,9 +158,7 @@ class TestNextRelationshipIds:
 
     def test_ids_handle_non_integer_rel_ids(self) -> None:
         ctx = _people_context(with_relationships=True)
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         # Shadow with string ID
         ctx._shadow_rels["KNOWS"] = pd.DataFrame(
             {
@@ -198,9 +182,7 @@ class TestShadowCreateEntity:
 
     def test_creates_into_new_type(self) -> None:
         ctx = _empty_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_entity(
             "Animal",
             [1, 2],
@@ -212,18 +194,14 @@ class TestShadowCreateEntity:
 
     def test_appends_to_existing_shadow(self) -> None:
         ctx = _empty_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_entity("Animal", [1], {"species": ["Cat"]})
         engine.shadow_create_entity("Animal", [2], {"species": ["Dog"]})
         assert len(ctx._shadow["Animal"]) == 2
 
     def test_seeds_from_live_table_when_no_shadow(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_entity(
             "Person",
             [4],
@@ -235,9 +213,7 @@ class TestShadowCreateEntity:
 
     def test_updates_attribute_map_for_new_columns(self) -> None:
         ctx = _people_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_entity(
             "Person",
             [4],
@@ -253,9 +229,7 @@ class TestShadowCreateRelationship:
 
     def test_creates_into_new_rel_type(self) -> None:
         ctx = _empty_context()
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_relationship("LIKES", [1], [10], [20])
         shadow = ctx._shadow_rels["LIKES"]
         assert len(shadow) == 1
@@ -264,9 +238,7 @@ class TestShadowCreateRelationship:
 
     def test_seeds_from_live_rel_table(self) -> None:
         ctx = _people_context(with_relationships=True)
-        engine = MutationEngine(
-            context=ctx, evaluator_factory=BindingExpressionEvaluator
-        )
+        engine = MutationEngine(context=ctx, evaluator_factory=BindingExpressionEvaluator)
         engine.shadow_create_relationship("KNOWS", [102], [3], [1])
         shadow = ctx._shadow_rels["KNOWS"]
         assert len(shadow) == 3  # 2 existing + 1 new

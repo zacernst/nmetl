@@ -17,6 +17,7 @@ from pycypher.relational_models import (
 )
 from pycypher.star import Star
 
+
 # ---------------------------------------------------------------------------
 # PATH EXPANDER TESTS
 # ---------------------------------------------------------------------------
@@ -25,19 +26,15 @@ from pycypher.star import Star
 @pytest.fixture
 def path_star() -> Star:
     """Star for path expansion testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3, 4, 5],
-            "name": ["A", "B", "C", "D", "E"],
-        }
-    )
-    knows_df = pd.DataFrame(
-        {
-            "__ID__": [101, 102, 103, 104, 105],
-            "__SOURCE__": [1, 2, 3, 4, 1],
-            "__TARGET__": [2, 3, 4, 5, 3],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3, 4, 5],
+        "name": ["A", "B", "C", "D", "E"],
+    })
+    knows_df = pd.DataFrame({
+        "__ID__": [101, 102, 103, 104, 105],
+        "__SOURCE__": [1, 2, 3, 4, 1],
+        "__TARGET__": [2, 3, 4, 5, 3],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -60,9 +57,7 @@ def path_star() -> Star:
 
     context = Context(
         entity_mapping=EntityMapping(mapping={"Person": person_table}),
-        relationship_mapping=RelationshipMapping(
-            mapping={"KNOWS": knows_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"KNOWS": knows_table}),
     )
     return Star(context=context)
 
@@ -125,13 +120,11 @@ class TestPathExpander:
 @pytest.fixture
 def card_star() -> Star:
     """Star for cardinality estimation testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": list(range(1, 101)),  # 100 people
-            "name": [f"Person{i}" for i in range(100)],
-            "age": [20 + (i % 50) for i in range(100)],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": list(range(1, 101)),  # 100 people
+        "name": [f"Person{i}" for i in range(100)],
+        "age": [20 + (i % 50) for i in range(100)],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -154,9 +147,7 @@ class TestCardinalityEstimator:
 
     def test_single_entity_cardinality(self, card_star: Star) -> None:
         """Estimate for entity scan."""
-        result = card_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = card_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 100
 
     def test_filtered_entity_cardinality(self, card_star: Star) -> None:
@@ -282,13 +273,11 @@ class TestRelationalModels:
 
     def test_relationship_endpoints(self) -> None:
         """Relationship tracks source/target."""
-        rel_df = pd.DataFrame(
-            {
-                "__ID__": [1],
-                "__SOURCE__": [10],
-                "__TARGET__": [20],
-            }
-        )
+        rel_df = pd.DataFrame({
+            "__ID__": [1],
+            "__SOURCE__": [10],
+            "__TARGET__": [20],
+        })
         assert rel_df.iloc[0]["__SOURCE__"] == 10
         assert rel_df.iloc[0]["__TARGET__"] == 20
 
@@ -350,7 +339,9 @@ class TestBindingEvaluator:
 
     def test_binding_creation(self, card_star: Star) -> None:
         """Create binding from node."""
-        result = card_star.execute_query("MATCH (n:Person) RETURN n LIMIT 1")
+        result = card_star.execute_query(
+            "MATCH (n:Person) RETURN n LIMIT 1"
+        )
         assert len(result) == 1
 
     def test_binding_column_addition(self, card_star: Star) -> None:
@@ -395,9 +386,7 @@ class TestCollectionEvaluator:
     def test_list_slice(self, card_star: Star) -> None:
         """Slice list."""
         # Slice syntax is [start..end] (double-dot), not Python's [start:end].
-        result = card_star.execute_query(
-            "RETURN [1, 2, 3, 4, 5][1..3] as slice"
-        )
+        result = card_star.execute_query("RETURN [1, 2, 3, 4, 5][1..3] as slice")
         assert result is not None
 
     def test_list_contains(self, card_star: Star) -> None:
@@ -501,28 +490,20 @@ class TestStringPredicateEvaluator:
 
     def test_contains_basic(self, card_star: Star) -> None:
         """CONTAINS predicate."""
-        result = card_star.execute_query(
-            "RETURN 'hello' CONTAINS 'ell' as result"
-        )
+        result = card_star.execute_query("RETURN 'hello' CONTAINS 'ell' as result")
         assert result.iloc[0]["result"] is True
 
     def test_contains_case_sensitive(self, card_star: Star) -> None:
         """CONTAINS is case-sensitive."""
-        result = card_star.execute_query(
-            "RETURN 'Hello' CONTAINS 'hello' as result"
-        )
+        result = card_star.execute_query("RETURN 'Hello' CONTAINS 'hello' as result")
         assert result.iloc[0]["result"] is False
 
     def test_starts_with(self, card_star: Star) -> None:
         """STARTS WITH predicate."""
-        result = card_star.execute_query(
-            "RETURN 'hello' STARTS WITH 'he' as result"
-        )
+        result = card_star.execute_query("RETURN 'hello' STARTS WITH 'he' as result")
         assert result.iloc[0]["result"] is True
 
     def test_ends_with(self, card_star: Star) -> None:
         """ENDS WITH predicate."""
-        result = card_star.execute_query(
-            "RETURN 'hello' ENDS WITH 'lo' as result"
-        )
+        result = card_star.execute_query("RETURN 'hello' ENDS WITH 'lo' as result")
         assert result.iloc[0]["result"] is True

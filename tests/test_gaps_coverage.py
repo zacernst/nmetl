@@ -41,10 +41,7 @@ class TestComplexStructures:
         return_clause = stmt.get("return")
         if return_clause is None:
             for clause in stmt.get("clauses", []):
-                if (
-                    isinstance(clause, dict)
-                    and clause.get("type") == "ReturnStatement"
-                ):
+                if isinstance(clause, dict) and clause.get("type") == "ReturnStatement":
                     return_clause = clause
                     break
         ret_item = return_clause["body"]["items"][0]

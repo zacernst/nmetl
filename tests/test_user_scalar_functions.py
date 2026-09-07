@@ -181,9 +181,7 @@ class TestRegisterUserFunction:
         def takes_none():
             return 0
 
-        with pytest.raises(
-            TypeError, match="at least one positional argument"
-        ):
+        with pytest.raises(TypeError, match="at least one positional argument"):
             register_user_function(takes_none)
 
 
@@ -212,9 +210,7 @@ class TestRowExceptionHandling:
 
         # Per-row warnings (2) + summary line (1).
         warnings_text = "\n".join(
-            r.getMessage()
-            for r in caplog.records
-            if r.levelno >= logging.WARNING
+            r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING
         )
         assert "boom" in warnings_text
         assert "ValueError" in warnings_text
@@ -235,16 +231,21 @@ class TestRowExceptionHandling:
             wrapped(pd.Series(list(range(10))))
 
         per_row = [
-            r for r in caplog.records if "failed on row" in r.getMessage()
+            r for r in caplog.records
+            if "failed on row" in r.getMessage()
         ]
         assert len(per_row) == 3
         # A "further per-row failures will be suppressed" line.
         suppressed = [
-            r for r in caplog.records if "suppressed" in r.getMessage()
+            r for r in caplog.records
+            if "suppressed" in r.getMessage()
         ]
         assert len(suppressed) == 1
         # And a summary line.
-        summary = [r for r in caplog.records if "10 / 10" in r.getMessage()]
+        summary = [
+            r for r in caplog.records
+            if "10 / 10" in r.getMessage()
+        ]
         assert len(summary) == 1
 
     def test_no_warning_when_all_rows_succeed(self, caplog) -> None:
@@ -258,7 +259,6 @@ class TestRowExceptionHandling:
             wrapped(pd.Series([1, 2, 3]))
 
         assert not any(
-            "failed on row" in r.getMessage()
-            or "row(s) raised" in r.getMessage()
+            "failed on row" in r.getMessage() or "row(s) raised" in r.getMessage()
             for r in caplog.records
         )

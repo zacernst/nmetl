@@ -132,10 +132,7 @@ def profile_pytest_target(
     elapsed = time.monotonic() - start
 
     if result.returncode != 0 and not prof_path.exists():
-        print(
-            f"Warning: pytest exited with code {result.returncode}",
-            file=sys.stderr,
-        )
+        print(f"Warning: pytest exited with code {result.returncode}", file=sys.stderr)
         if result.stderr:
             print(result.stderr[:500], file=sys.stderr)
 
@@ -233,10 +230,8 @@ def main() -> int:
     print(f"  Top {len(summary.top_functions)} functions by {args.sort_key}")
 
     if summary.top_functions:
-        print(
-            f"\n  Hottest function: {summary.top_functions[0].function} "
-            f"({summary.top_functions[0].cumtime:.4f}s cumulative)"
-        )
+        print(f"\n  Hottest function: {summary.top_functions[0].function} "
+              f"({summary.top_functions[0].cumtime:.4f}s cumulative)")
 
     return 0
 

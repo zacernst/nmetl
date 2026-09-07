@@ -201,7 +201,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
 
             nr.result[nr.non_null_mask] = rounded_values
 
-        except ValueError, TypeError, IndexError:
+        except (ValueError, TypeError, IndexError):
             # Fallback for complex cases
             nr.result = pd.Series(
                 [None] * len(s),

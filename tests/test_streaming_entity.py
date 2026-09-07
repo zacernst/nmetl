@@ -195,7 +195,9 @@ class TestMixedSources:
         )
         assert run_query(context, "MATCH (p:Person) RETURN count(p)") == [[4]]
         assert run_query(context, "MATCH (w:Widget) RETURN count(w)") == [[2]]
-        assert is_streaming_source(context.entity_mapping["Person"].source_obj)
+        assert is_streaming_source(
+            context.entity_mapping["Person"].source_obj
+        )
         assert not is_streaming_source(
             context.entity_mapping["Widget"].source_obj
         )
@@ -208,10 +210,7 @@ class TestMixedSources:
             ContextBuilder()
             .add_entity("Person", people_parquet, id_col="pid", streaming=True)
             .add_relationship(
-                "KNOWS",
-                edges,
-                source_col="__SOURCE__",
-                target_col="__TARGET__",
+                "KNOWS", edges, source_col="__SOURCE__", target_col="__TARGET__"
             )
             .build(backend="duckdb")
         )

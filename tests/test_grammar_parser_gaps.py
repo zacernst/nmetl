@@ -321,7 +321,7 @@ class TestErrorMessages:
         try:
             parser.parse(query)
             pytest.fail("Should have raised parsing error")
-        except LarkError, UnexpectedInput, CypherSyntaxError:
+        except (LarkError, UnexpectedInput, CypherSyntaxError):
             # Should indicate unexpected token
             assert True
 
@@ -334,7 +334,7 @@ class TestErrorMessages:
             result = parser.parse(query)
             # If it parses, that's also valid behavior
             assert result is not None
-        except LarkError, UnexpectedInput, CypherSyntaxError:
+        except (LarkError, UnexpectedInput, CypherSyntaxError):
             # If it errors, that's expected
             pass
 
@@ -344,7 +344,7 @@ class TestErrorMessages:
         try:
             parser.parse(query)
             pytest.fail("Should have raised parsing error")
-        except LarkError, UnexpectedInput, CypherSyntaxError:
+        except (LarkError, UnexpectedInput, CypherSyntaxError):
             pass
 
     def test_incomplete_relationship_pattern_error(self, parser):
@@ -353,7 +353,7 @@ class TestErrorMessages:
         try:
             parser.parse(query)
             pytest.fail("Should have raised parsing error")
-        except LarkError, UnexpectedInput, CypherSyntaxError:
+        except (LarkError, UnexpectedInput, CypherSyntaxError):
             pass
 
 

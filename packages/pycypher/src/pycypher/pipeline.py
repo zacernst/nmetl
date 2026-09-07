@@ -550,37 +550,36 @@ class ExecuteStage(Stage):
         if isinstance(parsed, UnionQuery):
             ctx.result = ctx.star._execute_union_query(parsed)
         elif isinstance(parsed, Query):
-            # Opt-in out-of-core relation path for the eligible subset; every
-            # other query falls back to the pandas BindingFrame engine.  When
-            # the relation engine is disabled (default) this never fires, so
-            # behaviour is unchanged.  See pycypher.relation_engine.
+            # With the relation engine enabled on a DuckDB backend the query
+            # runs out-of-core via the logical plan, and a construct the
+            # plan has no rule for is a hard error naming that construct
+            # (pycypher.plan.Unsupported) -- never a silent fallback to the
+            # in-memory engine (ADR-008, generalisation plan Phase 5). With
+            # the engine disabled (default) the BindingFrame engine runs as
+            # before.
             from pycypher.relation_engine import (
                 execute_relation_mutation,
                 execute_relation_query,
-                is_relation_eligible,
                 is_relation_mutation_eligible,
                 relation_engine_enabled,
             )
 
             _context = ctx.star.context
-            mutation_kind = (
-                is_relation_mutation_eligible(parsed, _context)
-                if is_mutation and relation_engine_enabled(_context)
-                else None
-            )
             if (
-                not is_mutation
-                and relation_engine_enabled(_context)
-                and is_relation_eligible(parsed, _context)
+                relation_engine_enabled(_context)
+                and getattr(_context, "backend_name", None) == "duckdb"
             ):
-                ctx.result = execute_relation_query(parsed, _context)
-            elif mutation_kind is not None:
-                # Phase 2 (docs/duckdb_full_parity_design.md): a narrow
-                # single-table SET/CREATE/DELETE compiled to native DML.
-                import pandas as pd
+                from pycypher.plan import translate
 
-                execute_relation_mutation(parsed, _context, mutation_kind)
-                ctx.result = pd.DataFrame()
+                translate(parsed, _context)  # raises Unsupported
+                mutation_kind = is_relation_mutation_eligible(parsed, _context)
+                if mutation_kind is not None:
+                    import pandas as pd
+
+                    execute_relation_mutation(parsed, _context, mutation_kind)
+                    ctx.result = pd.DataFrame()
+                else:
+                    ctx.result = execute_relation_query(parsed, _context)
             else:
                 ctx.result = ctx.star._execute_query_binding_frame(parsed)
         else:

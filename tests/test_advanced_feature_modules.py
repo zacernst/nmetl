@@ -17,6 +17,7 @@ from pycypher.relational_models import (
 )
 from pycypher.star import Star
 
+
 # ---------------------------------------------------------------------------
 # SUBQUERY PROTOCOL TESTS
 # ---------------------------------------------------------------------------
@@ -25,13 +26,11 @@ from pycypher.star import Star
 @pytest.fixture
 def subquery_star() -> Star:
     """Star for subquery testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3],
-            "name": ["Alice", "Bob", "Carol"],
-            "age": [30, 25, 35],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3],
+        "name": ["Alice", "Bob", "Carol"],
+        "age": [30, 25, 35],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -88,12 +87,8 @@ class TestMultiQueryRewriter:
     def test_two_independent_queries(self, subquery_star: Star) -> None:
         """Two queries with no dependencies."""
         # Run two independent queries
-        result1 = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
-        result2 = subquery_star.execute_query(
-            "MATCH (n:Person) WHERE n.age > 25 RETURN COUNT(*) as cnt"
-        )
+        result1 = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
+        result2 = subquery_star.execute_query("MATCH (n:Person) WHERE n.age > 25 RETURN COUNT(*) as cnt")
 
         assert result1.iloc[0]["cnt"] == 3
         assert result2.iloc[0]["cnt"] > 0
@@ -130,12 +125,8 @@ class TestExecutionScope:
 
     def test_scope_isolation(self, subquery_star: Star) -> None:
         """Scopes are properly isolated."""
-        result1 = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
-        result2 = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result1 = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
+        result2 = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
 
         # Same query twice should give same result
         assert result1.iloc[0]["cnt"] == result2.iloc[0]["cnt"]
@@ -152,18 +143,14 @@ class TestAudit:
     def test_audit_log_creation(self, subquery_star: Star) -> None:
         """Audit log entry is created."""
         # Execute query (may log audit entry)
-        result = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result is not None
 
     def test_audit_chain_integrity(self, subquery_star: Star) -> None:
         """Audit chain integrity verification."""
         # Run multiple operations
         subquery_star.execute_query("MATCH (n:Person) RETURN n.name")
-        subquery_star.execute_query(
-            "MATCH (n:Person) WHERE n.age > 25 RETURN n.name"
-        )
+        subquery_star.execute_query("MATCH (n:Person) WHERE n.age > 25 RETURN n.name")
 
         # Chain should be intact
 
@@ -179,19 +166,13 @@ class TestCluster:
     def test_cluster_operations(self, subquery_star: Star) -> None:
         """Cluster operations work correctly."""
         # Single-node cluster operations
-        result = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result is not None
 
     def test_cluster_state(self, subquery_star: Star) -> None:
         """Cluster state is consistent."""
-        result1 = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
-        result2 = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result1 = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
+        result2 = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
 
         # State should be consistent
         assert result1.iloc[0]["cnt"] == result2.iloc[0]["cnt"]
@@ -250,9 +231,7 @@ class TestAstConverter:
 
     def test_convert_create_clause(self, subquery_star: Star) -> None:
         """Convert CREATE clause."""
-        result = subquery_star.execute_query(
-            "CREATE (n:Person {name: 'Test'}) RETURN n.name"
-        )
+        result = subquery_star.execute_query("CREATE (n:Person {name: 'Test'}) RETURN n.name")
         assert result.iloc[0]["name"] == "Test"
 
     def test_convert_where_clause(self, subquery_star: Star) -> None:
@@ -264,16 +243,12 @@ class TestAstConverter:
 
     def test_convert_return_clause(self, subquery_star: Star) -> None:
         """Convert RETURN clause."""
-        result = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN n.name, n.age"
-        )
+        result = subquery_star.execute_query("MATCH (n:Person) RETURN n.name, n.age")
         assert len(result.columns) == 2
 
     def test_convert_literal_expression(self, subquery_star: Star) -> None:
         """Convert literal expressions."""
-        result = subquery_star.execute_query(
-            "RETURN 42 as num, 'hello' as str"
-        )
+        result = subquery_star.execute_query("RETURN 42 as num, 'hello' as str")
         assert result.iloc[0]["num"] == 42
         assert result.iloc[0]["str"] == "hello"
 
@@ -298,9 +273,7 @@ class TestCliQuery:
 
     def test_cli_execute_simple_match(self, subquery_star: Star) -> None:
         """Execute simple MATCH via CLI."""
-        result = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN n.name ORDER BY n.name"
-        )
+        result = subquery_star.execute_query("MATCH (n:Person) RETURN n.name ORDER BY n.name")
         assert len(result) == 3
 
     def test_cli_execute_with_parameters(self, subquery_star: Star) -> None:
@@ -338,9 +311,7 @@ class TestNmetlCli:
 
     def test_nmetl_query_subcommand(self, subquery_star: Star) -> None:
         """NMETL query subcommand works."""
-        result = subquery_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = subquery_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
 
@@ -396,7 +367,9 @@ class TestAdvancedFeaturesErrorHandling:
     def test_scope_violation(self, subquery_star: Star) -> None:
         """Scope violation detection."""
         try:
-            subquery_star.execute_query("WITH x MATCH (n:Person) RETURN n")
+            subquery_star.execute_query(
+                "WITH x MATCH (n:Person) RETURN n"
+            )
         except Exception:
             pass  # Error expected
 

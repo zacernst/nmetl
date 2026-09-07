@@ -74,7 +74,7 @@ class TestSpecificExceptionCatching:
             try:
                 # This might raise various specific exceptions
                 pd.Series([1, 2, 3]).map({"a": 1})  # Raises KeyError
-            except KeyError, ValueError, TypeError:  # Specific exceptions only
+            except (KeyError, ValueError, TypeError):  # Specific exceptions only
                 return
 
         # Both should handle the error, but good pattern is more specific

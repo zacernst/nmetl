@@ -1,4 +1,4 @@
-"""Phase 2b category (E) (docs/fastopendata_streaming_qualification_plan.md)
+"""Phase 2b category (E) (the FastOpenData streaming-qualification plan (private repository))
 — a ``SET`` clause as an ordinary *stage* inside the read-eligible pipeline,
 not just the terminal clause of a dedicated mutation kind.
 
@@ -193,7 +193,8 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_set_after_a_join_pattern(self, tmp_path) -> None:
+    def test_eligible_set_after_a_join_pattern(self, tmp_path) -> None:
+        # Plan translator: bindings are ids, so a SET after a joined pattern needs no single-component scope.
         # Single-component restriction: a SET stage after a fixed-length
         # (joined) pattern is out of scope -- see _single_component_scope.
         hh_path = tmp_path / "households.parquet"
@@ -227,7 +228,7 @@ class TestEligibility:
             source_col="src",
             target_col="tgt",
         )
-        assert not is_relation_eligible(
+        assert is_relation_eligible(
             _ast(
                 "MATCH (h:Household)-[:LOCATED_IN]->(p:PUMA) "
                 "SET p.foo = h.income "
@@ -236,13 +237,14 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_mixed_with_combines_passthrough_and_aggregate(
+    def test_eligible_mixed_with_combines_passthrough_and_aggregate(
         self, osm_parquet
     ) -> None:
+        # Plan translator: a passed-through node groups by its id alongside aggregates.
         # Aggregation changes cardinality -- incompatible with carrying a
         # raw node's full row through unchanged.
         ctx = _osm_ctx(osm_parquet)
-        assert not is_relation_eligible(
+        assert is_relation_eligible(
             _ast(
                 "MATCH (o:OSMNode) WITH o, COUNT(o) AS cnt RETURN cnt",
             ),

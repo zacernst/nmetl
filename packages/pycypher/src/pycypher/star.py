@@ -617,7 +617,12 @@ class Star:
             else ASTConverter.from_cypher(query)
         )
         if not is_relation_eligible(ast, self.context):
-            return False
+            from pycypher.plan import Unsupported, translate
+
+            translate(
+                ast, self.context
+            )  # raises Unsupported naming the construct
+            raise Unsupported("stream", "query has no RETURN to stream")
 
         bindings = execute_relation_query(ast, self.context, materialize=False)
         write_relation_to_uri(bindings.lazy, uri, fmt)

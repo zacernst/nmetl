@@ -274,7 +274,9 @@ def _cleanup_merged_lazy(
     keep = [c for c in columns if c not in drop]
     escaped = ", ".join('"{}"'.format(c.replace('"', '""')) for c in keep)
     try:
-        return DuckDBLazyFrame(merged.relation.project(escaped), merged._conn)
+        return DuckDBLazyFrame(
+            merged.relation.project(escaped), merged._conn
+        )
     except Exception:  # noqa: BLE001 — fall back to the pandas cleanup
         LOGGER.debug("Lazy merge cleanup failed; materialising", exc_info=True)
         return merged.to_pandas().drop(columns=list(drop))
@@ -927,9 +929,7 @@ class BindingFrame:
         # which copies the whole entity table into object-dtype numpy arrays
         # just to answer lookups for the ids this frame happens to hold.
         if self.is_lazy:
-            resolved = self._get_property_from_relation(
-                entity_type, var_name, prop_name
-            )
+            resolved = self._get_property_from_relation(entity_type, var_name, prop_name)
             if resolved is not None:
                 self._property_cache[_cache_key] = resolved
                 return resolved

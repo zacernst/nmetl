@@ -384,9 +384,7 @@ class TestMemoryStability:
 
         gc.collect()
         growth = _get_process_memory_mb() - baseline
-        assert growth < perf_threshold(100), (
-            f"Backend switching leaked {growth:.1f}MB"
-        )
+        assert growth < perf_threshold(100), f"Backend switching leaked {growth:.1f}MB"
 
 
 # ---------------------------------------------------------------------------

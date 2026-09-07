@@ -239,7 +239,7 @@ class StringPredicateEvaluator:
             try:
                 if v != v:  # NaN check (NaN != NaN)
                     continue
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue  # pd.NA raises TypeError in boolean context
             # Found first non-null value — check type.
             if not isinstance(v, str):

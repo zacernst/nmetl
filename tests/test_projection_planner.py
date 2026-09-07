@@ -46,10 +46,7 @@ def _make_planner(
     if where_fn is None:
         where_fn = MagicMock()
     return ProjectionPlanner(
-        agg_planner,
-        renderer,
-        where_fn,
-        evaluator_factory=BindingExpressionEvaluator,
+        agg_planner, renderer, where_fn, evaluator_factory=BindingExpressionEvaluator
     )
 
 

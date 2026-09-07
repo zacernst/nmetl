@@ -3,8 +3,8 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 pycypher = { workspace = true }
+nmetl = { workspace = true }
 shared = { workspace = true }
-pycypher-tui = { workspace = true }
 
 [tool.uv]
 environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
@@ -25,12 +25,12 @@ constraint-dependencies = [
 
 
 [project]
-name = "pycypher-workspace"
+name = "nmetl-workspace"
 version = "0.0.1"
-description = "PyCypher monorepo workspace"
+description = "PyCypher query engine and nmetl ETL tool (monorepo workspace)"
 readme = "README.md"
 requires-python = "==3.14.*"
-keywords = ["neo4j", "cypher", "parser", "relational algebra"]
+keywords = ["neo4j", "cypher", "parser", "relational algebra", "etl", "duckdb"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -39,8 +39,14 @@ classifiers = [
   # promised installs that pip/uv would reject.
   "Programming Language :: Python :: 3.14",
 ]
-
-dependencies = ["pycypher", "shared", "pycypher-tui"]
+# The workspace root is an aggregator: it pins the members and nothing else.
+# Third-party runtime deps belong to whichever member imports them (duckdb ->
+# pycypher, opentelemetry -> shared).
+dependencies = [
+  "pycypher",
+  "nmetl",
+  "shared",
+]
 
 [[project.authors]]
 name = "Zachary Ernst"
@@ -54,8 +60,8 @@ email = "zac.ernst@gmail.com"
 file = "LICENSE.txt"
 
 [project.urls]
-Homepage = "https://github.com/zacernst/pycypher"
-Documentation = "https://zacernst.github.io/pycypher/"
+Homepage = "https://github.com/zacernst/nmetl"
+Documentation = "https://zacernst.github.io/nmetl/"
 
 [tool.pylint.main]
 disable = ["line-too-long", "trailing-whitespace", "missing-docstring"]
@@ -91,6 +97,8 @@ indent-width = 4
 # formatter only applies it when target-version says 3.14. Since every package
 # here requires ==3.14.*, the rewrite is correct and the workaround was not.
 #
+# Under py312 any file using PEP 758 syntax was reported as a syntax error
+# and skipped entirely; py314 lints it and reformats nothing.
 target-version = "py314"
 exclude = [
   ".bzr",
@@ -130,8 +138,10 @@ ignore = [
   # Test-suite noise — assert is idiomatic in pytest
   "S101", # assert — 13K+ hits, all in tests
   # Docstring rules that conflict with each other
-  "D203",   # incorrect-blank-line-before-class — conflicts with D211
-  "D213",   # multi-line-summary-second-line — conflicts with D212
+  "D203", # incorrect-blank-line-before-class — conflicts with D211
+  "D213", # multi-line-summary-second-line — conflicts with D212
+  # No file in this repo carries a copyright header, so this is a project-wide
+  # policy, not a per-package one.
   "CPY001", # missing-copyright-notice
 ]
 
@@ -156,10 +166,30 @@ ignore = [
   "RUF001",  # ambiguous unicode ok in test strings
   "E501",    # line length relaxed in tests (long assertions)
 ]
+# nmetl tests were split out of tests/ unchanged; they keep the same relaxed
+# ruleset as the engine tests rather than the packages/*/tests backlog list.
+"packages/nmetl/tests/**/*.py" = [
+  "ANN",     # type annotations not required in tests
+  "D",       # docstrings not required in tests
+  "PLR2004", # magic value comparisons are normal in tests
+  "SLF001",  # accessing private members is normal in tests
+  "INP001",  # implicit namespace packages (test directories)
+  "PLC0415", # imports inside functions are common in tests
+  "ARG002",  # unused method arguments (fixtures, parametrize)
+  "E712",    # true-false comparison (pandas idx filtering in tests)
+  "T201",    # print statements ok in tests
+  "ERA001",  # commented-out code ok in tests
+  "B905",    # zip-without-explicit-strict ok in tests
+  "FBT003",  # boolean positional values ok in tests
+  "PT011",   # pytest-raises-too-broad ok in tests
+  "B017",    # assert-raises-exception ok in tests
+  "RUF002",  # ambiguous unicode ok in test docstrings
+  "RUF001",  # ambiguous unicode ok in test strings
+  "E501",    # line length relaxed in tests (long assertions)
+]
 # Standalone scripts, demos, examples: relax annotations and docstrings
 "scripts/**/*.py" = ["ANN", "D", "INP001", "T201"]
 "examples/**/*.py" = ["ANN", "D", "INP001", "T201"]
-"demos/**/*.py" = ["ANN", "D", "INP001", "T201", "ERA001"]
 "demo_*.py" = ["ANN", "D", "INP001", "T201"]
 # ---------------------------------------------------------------------------
 # Grandfathered backlog.
@@ -184,240 +214,63 @@ ignore = [
 # those files read as unused. Drop RUF100 and the stale noqa comments together
 # with the rule they guard.
 #
-# 1213 pre-existing violations, 81 rules
-# 1005 pre-existing violations, 67 rules
-"packages/pycypher-tui/src/**/*.py" = [
-  "A002",
-  "ANN001",
-  "ANN003",
-  "ANN201",
-  "ANN202",
-  "ANN204",
-  "ANN401",
-  "ARG001",
-  "ARG002",
-  "B905",
-  "BLE001",
-  "C901",
-  "D102",
-  "D107",
-  "D301",
-  "D401",
-  "D413",
-  "E402",
-  "E501",
-  "EM102",
-  "ERA001",
-  "F401",
-  "F541",
-  "F811",
-  "F821",
-  "F841",
-  "FBT001",
-  "FBT002",
-  "FBT003",
-  "FURB110",
-  "ISC004",
-  "PERF401",
-  "PIE810",
-  "PLC0415",
-  "PLR0911",
-  "PLR0912",
-  "PLR0913",
-  "PLR0915",
-  "PLR1714",
-  "PLR2004",
-  "PLR5501",
-  "PTH105",
-  "PTH108",
-  "PTH110",
-  "RET505",
-  "RUF005",
-  "RUF012",
-  "RUF019",
-  "RUF022",
-  "RUF100",
-  "S110",
-  "SIM102",
-  "SIM103",
-  "SIM110",
-  "SIM117",
-  "SIM118",
-  "SLF001",
-  "T201",
-  "TC001",
-  "TC002",
-  "TRY003",
-  "TRY300",
-  "TRY301",
-  "TRY401",
-  "UP035",
-  "UP037",
-  "UP046",
-]
 # 3336 pre-existing violations, 111 rules
 "packages/pycypher/src/**/*.py" = [
-  "A002",
-  "ANN001",
-  "ANN201",
-  "ANN202",
-  "ANN205",
-  "ANN401",
-  "ARG001",
-  "ARG002",
-  "ARG003",
-  "ARG004",
-  "B007",
-  "B023",
-  "B904",
-  "B905",
-  "BLE001",
-  "C401",
-  "C416",
-  "C901",
-  "D102",
-  "D105",
-  "D107",
-  "D205",
-  "D301",
-  "D400",
-  "D401",
-  "D407",
-  "D412",
-  "D413",
-  "D417",
-  "DTZ001",
-  "DTZ005",
-  "DTZ011",
-  "E402",
-  "E501",
-  "E721",
-  "EM101",
-  "EM102",
-  "ERA001",
-  "F401",
-  "F841",
-  "FBT001",
-  "FBT002",
-  "FBT003",
-  "FURB110",
-  "FURB168",
-  "FURB171",
-  "I001",
-  "ICN001",
-  "N802",
-  "N806",
-  "N811",
-  "N814",
-  "PD009",
-  "PD011",
-  "PERF401",
-  "PERF403",
-  "PLC0207",
-  "PLC0414",
-  "PLC0415",
-  "PLR0124",
-  "PLR0911",
-  "PLR0912",
-  "PLR0913",
-  "PLR0915",
-  "PLR0917",
-  "PLR1714",
-  "PLR1716",
-  "PLR2004",
-  "PLR5501",
-  "PLW0108",
-  "PLW0603",
-  "PLW2901",
-  "PTH103",
-  "PTH107",
-  "PTH123",
-  "PTH204",
-  "PTH207",
-  "PYI034",
-  "PYI063",
-  "RET504",
-  "RUF001",
-  "RUF002",
-  "RUF003",
-  "RUF005",
-  "RUF012",
-  "RUF022",
-  "RUF023",
-  "RUF036",
-  "RUF059",
-  "RUF100",
-  "S105",
-  "S110",
-  "S608",
-  "SIM101",
-  "SIM102",
-  "SIM103",
-  "SIM105",
-  "SIM108",
-  "SIM114",
-  "SLF001",
-  "T201",
-  "TC001",
-  "TC002",
-  "TC003",
-  "TC005",
-  "TC006",
-  "TRY003",
-  "TRY300",
-  "TRY301",
-  "UP006",
-  "UP035",
+  "A002", "ANN001", "ANN201", "ANN202", "ANN205", "ANN401", "ARG001",
+  "ARG002", "ARG003", "ARG004", "B007", "B023", "B904", "B905", "BLE001",
+  "C401", "C416", "C901", "D102", "D105", "D107", "D205", "D301", "D400",
+  "D401", "D407", "D412", "D413", "D417", "DTZ001", "DTZ005", "DTZ011",
+  "E402", "E501", "E721", "EM101", "EM102", "ERA001", "F401", "F841",
+  "FBT001", "FBT002", "FBT003", "FURB110", "FURB168", "FURB171", "I001",
+  "ICN001", "N802", "N806", "N811", "N814", "PD009", "PD011", "PERF401",
+  "PERF403", "PLC0207", "PLC0414", "PLC0415", "PLR0124", "PLR0911",
+  "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR1714", "PLR1716",
+  "PLR2004", "PLR5501", "PLW0108", "PLW0603", "PLW2901", "PTH103",
+  "PTH107", "PTH123", "PTH204", "PTH207", "PYI034", "PYI063", "RET504",
+  "RUF001", "RUF002", "RUF003", "RUF005", "RUF012", "RUF022", "RUF023",
+  "RUF036", "RUF059", "RUF100", "S105", "S110", "S608", "SIM101",
+  "SIM102", "SIM103", "SIM105", "SIM108", "SIM114", "SLF001", "T201",
+  "TC001", "TC002", "TC003", "TC005", "TC006", "TRY003", "TRY300",
+  "TRY301", "UP006", "UP035"
+]
+# Same grandfathered list as pycypher: these modules were split out of it
+# unchanged. Trim as they are cleaned up.
+"packages/nmetl/src/**/*.py" = [
+  "A002", "ANN001", "ANN201", "ANN202", "ANN205", "ANN401", "ARG001",
+  "ARG002", "ARG003", "ARG004", "B007", "B023", "B904", "B905", "BLE001",
+  "C401", "C416", "C901", "D102", "D105", "D107", "D205", "D301", "D400",
+  "D401", "D407", "D412", "D413", "D417", "DTZ001", "DTZ005", "DTZ011",
+  "E402", "E501", "E721", "EM101", "EM102", "ERA001", "F401", "F841",
+  "FBT001", "FBT002", "FBT003", "FURB110", "FURB168", "FURB171", "I001",
+  "ICN001", "N802", "N806", "N811", "N814", "PD009", "PD011", "PERF401",
+  "PERF403", "PLC0207", "PLC0414", "PLC0415", "PLR0124", "PLR0911",
+  "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR1714", "PLR1716",
+  "PLR2004", "PLR5501", "PLW0108", "PLW0603", "PLW2901", "PTH103",
+  "PTH107", "PTH123", "PTH204", "PTH207", "PYI034", "PYI063", "RET504",
+  "RUF001", "RUF002", "RUF003", "RUF005", "RUF012", "RUF022", "RUF023",
+  "RUF036", "RUF059", "RUF100", "S105", "S110", "S608", "SIM101",
+  "SIM102", "SIM103", "SIM105", "SIM108", "SIM114", "SLF001", "T201",
+  "TC001", "TC002", "TC003", "TC005", "TC006", "TRY003", "TRY300",
+  "TRY301", "UP006", "UP035"
 ]
 # 127 pre-existing violations, 25 rules
 "packages/shared/src/**/*.py" = [
-  "ANN401",
-  "ARG002",
-  "C901",
-  "D102",
-  "D107",
-  "D401",
-  "D413",
-  "E501",
-  "FBT001",
-  "FBT002",
-  "N806",
-  "PERF401",
-  "PLC0415",
-  "PLR0912",
-  "PLR0913",
-  "PLR0915",
-  "PLR2004",
-  "PYI034",
-  "PYI041",
-  "RUF002",
-  "RUF022",
-  "SIM105",
-  "SLF001",
-  "TRY004",
-  "UP045",
+  "ANN401", "ARG002", "C901", "D102", "D107", "D401", "D413", "E501",
+  "FBT001", "FBT002", "N806", "PERF401", "PLC0415", "PLR0912", "PLR0913",
+  "PLR0915", "PLR2004", "PYI034", "PYI041", "RUF002", "RUF022", "SIM105",
+  "SLF001", "TRY004", "UP045"
 ]
 # 45 pre-existing violations, 6 rules
-"packages/*/*.py" = ["ANN201", "BLE001", "E501", "PLC0415", "S108", "T201"]
+"packages/*/*.py" = [
+  "ANN201", "BLE001", "E501", "PLC0415", "S108", "T201"
+]
 # 30 pre-existing violations, 7 rules
 "packages/*/benchmarks/**/*.py" = [
-  "BLE001",
-  "D103",
-  "E501",
-  "INP001",
-  "ISC004",
-  "PLR0124",
-  "T201",
+  "BLE001", "D103", "E501", "INP001", "ISC004", "PLR0124", "T201"
 ]
 # 8 pre-existing violations, 7 rules
 "packages/*/docs/**/*.py" = [
-  "A001",
-  "ARG001",
-  "D100",
-  "E501",
-  "INP001",
-  "PLC0415",
-  "PTH100",
+  "A001", "ARG001", "D100", "E501", "INP001", "PLC0415", "PTH100"
 ]
 # 5402 pre-existing violations, 62 rules
 # NB: RUF100 is listed here because grandfathering SLF001/F401 below
@@ -425,78 +278,26 @@ ignore = [
 # unused. Drop RUF100 and the stale noqa comments together with the
 # rule they guard.
 "packages/*/tests/**/*.py" = [
-  "ANN001",
-  "ANN002",
-  "ANN003",
-  "ANN201",
-  "ANN202",
-  "ANN204",
-  "ANN401",
-  "ARG001",
-  "ARG002",
-  "ARG005",
-  "B007",
-  "B009",
-  "B905",
-  "BLE001",
-  "C408",
-  "D101",
-  "D102",
-  "D103",
-  "D104",
-  "D107",
-  "D205",
-  "D301",
-  "D400",
-  "D401",
-  "D403",
-  "D415",
-  "E402",
-  "E501",
-  "E741",
-  "EM102",
-  "ERA001",
-  "F401",
-  "F841",
-  "FBT003",
-  "I001",
-  "N802",
-  "PD011",
-  "PERF401",
-  "PLC0415",
-  "PLR0913",
-  "PLR2004",
-  "PLW0108",
-  "PT018",
-  "PTH123",
-  "RET505",
-  "RUF002",
-  "RUF005",
-  "RUF012",
-  "RUF015",
-  "RUF043",
-  "RUF059",
-  "S105",
-  "S106",
-  "S108",
-  "S110",
-  "S603",
-  "S607",
-  "SIM105",
-  "SLF001",
-  "TC002",
-  "TC003",
-  "TRY003",
-  "RUF100",
+  "ANN001", "ANN002", "ANN003", "ANN201", "ANN202", "ANN204", "ANN401",
+  "ARG001", "ARG002", "ARG005", "B007", "B009", "B905", "BLE001", "C408",
+  "D101", "D102", "D103", "D104", "D107", "D205", "D301", "D400", "D401",
+  "D403", "D415", "E402", "E501", "E741", "EM102", "ERA001", "F401",
+  "F841", "FBT003", "I001", "N802", "PD011", "PERF401", "PLC0415",
+  "PLR0913", "PLR2004", "PLW0108", "PT018", "PTH123", "RET505", "RUF002",
+  "RUF005", "RUF012", "RUF015", "RUF043", "RUF059", "S105", "S106",
+  "S108", "S110", "S603", "S607", "SIM105", "SLF001", "TC002", "TC003",
+  "TRY003", "RUF100"
 ]
 
 [tool.coverage.run]
 source = [
   "packages/pycypher/src/pycypher",
+  "packages/nmetl/src/nmetl",
   "packages/shared/src/shared",
-  "packages/pycypher-tui/src/pycypher_tui",
 ]
-omit = ["*/.local/*", "*/filter_us_nodes.py"]
+omit = [
+  "*/.local/*",
+]
 
 [tool.coverage.report]
 fail_under = 80
@@ -524,16 +325,21 @@ addopts = [
 ]
 # Every test directory in the repo. Previously ["tests"] only, which silently
 # excluded all 65 test files under packages/ from `pytest` at the repo root.
-testpaths = ["tests", "packages/pycypher-tui/tests"]
+testpaths = [
+  "tests",
+  "packages/nmetl/tests",
+]
+# "." is required so that `packages.nmetl.tests` resolves as a
+# namespace packages (see consider_namespace_packages below); without it the
+# rootdir is not on sys.path and the walk-up falls back to a bare `tests`.
 pythonpath = [".", "tests"]
+# All the test directories are named `tests` and each has an __init__.py, so
+# without this every one of them resolves to the module name `tests.conftest`
+# and pytest aborts with "Plugin already registered under a different name".
+# Namespace-package resolution walks up to the rootdir instead, yielding
+# unique names like packages.nmetl.tests.conftest.
 consider_namespace_packages = true
-# Required by pycypher-tui's async tests, which use bare `async def test_*`
-# with no @pytest.mark.asyncio. This was previously set only in
-# packages/pycypher-tui/pyproject.toml, so it applied only when pytest was
-# invoked from inside that directory.
-asyncio_mode = "auto"
 norecursedirs = [
-  "google-cloud-sdk",
   ".venv",
   ".git",
   "node_modules",
@@ -572,8 +378,8 @@ skips = [
 ]
 targets = [
   "packages/pycypher/src",
+  "packages/nmetl/src",
   "packages/shared/src",
-  "packages/pycypher-tui/src",
 ]
 
 [dependency-groups]
@@ -586,11 +392,9 @@ dev-core = [
   "pytest-xdist>=3.6.1,<4.0.0",
   "pytest-mock>=3.14.0,<4.0.0",
   "pytest-timeout>=2.3.1,<3.0.0",
-  "pytest-benchmark>=4.0.0,<5.0.0", # Performance benchmarking
+  "pytest-benchmark>=4.0.0,<6.0.0", # Performance benchmarking
   "pytest-watch>=4.2.0,<5.0.0",     # File-watching test runner for TDD
-  "pytest-asyncio>=1.3.0,<2.0.0",   # Required by pycypher-tui async test fixtures
   "hypothesis>=6.100.0,<7.0.0",     # Property-based testing (tests/property_based/)
-  "textual-dev>=1.0.0,<2.0.0",      # `textual run --dev` console for pycypher-tui
 
   # Code quality
   "ruff>=0.6.3,<1.0.0",
@@ -606,7 +410,6 @@ dev-core = [
 
   # Runtime utilities used in tests
   "psutil>=5.9.0,<8.0.0", # System and process utilities for performance monitoring
-  "httpx>=0.27.0,<1.0.0",
 ]
 
 # Full dev environment: includes dev-core + distributed computing + Neo4j.

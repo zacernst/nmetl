@@ -209,15 +209,11 @@ class TestArithmeticExpressionEvaluator:
         test_frame: BindingFrame,
     ) -> ArithmeticExpressionEvaluator:
         """Create ArithmeticExpressionEvaluator instance."""
-        return ArithmeticExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        return ArithmeticExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
 
     def test_evaluator_initialization(self, test_frame: BindingFrame) -> None:
         """Test evaluator initializes correctly."""
-        evaluator = ArithmeticExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = ArithmeticExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         assert evaluator.frame is test_frame
 
     def test_evaluate_arithmetic_addition(

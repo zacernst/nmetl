@@ -127,9 +127,7 @@ class TestPatternComprehension:
             type_registry={"p": "Person"},
             context=ctx,
         )
-        evaluator = CollectionExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = CollectionExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         class FakePC:
             variable: Any = None
@@ -165,9 +163,7 @@ class TestMapLiteralEdgePaths:
             type_registry={"p": "Person"},
             context=ctx,
         )
-        evaluator = CollectionExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = CollectionExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         ml = MapLiteral(entries={}, value={})
 
@@ -189,9 +185,7 @@ class TestMapLiteralEdgePaths:
             type_registry={"p": "Person"},
             context=ctx,
         )
-        evaluator = CollectionExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = CollectionExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         ml = MapLiteral(entries={}, value={"x": 42, "y": "hello"})
 
@@ -265,9 +259,7 @@ class TestMapProjectionEmpty:
             type_registry={"p": "Person"},
             context=ctx,
         )
-        evaluator = CollectionExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = CollectionExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         class FakeVariable:
             name: str = "p"

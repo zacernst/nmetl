@@ -14,10 +14,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-# Suppress framework warnings/errors for clean demo output — the demo
-# intentionally triggers error-handling paths that produce log noise.
-logging.disable(logging.CRITICAL)
-
 import pandas as pd
 from pycypher import ContextBuilder, Star
 
@@ -370,4 +366,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Suppress framework warnings/errors for clean demo output — the demo
+    # intentionally triggers error-handling paths that produce log noise.
+    # Done here, not at import time, so importing this module (as the test
+    # suite does) never silences logging for the whole process.
+    logging.disable(logging.CRITICAL)
     main()

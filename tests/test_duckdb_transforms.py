@@ -63,9 +63,7 @@ class TestRename:
         assert renamed.is_lazy is True
 
     def test_rename_preserves_column_order(self, backend):
-        lazy = _lazy(
-            backend, pd.DataFrame({"z": [1], "a": [2], "m": [3]}), "t"
-        )
+        lazy = _lazy(backend, pd.DataFrame({"z": [1], "a": [2], "m": [3]}), "t")
         out = backend.rename(lazy, {"a": "b"})
         assert list(out.columns) == ["z", "b", "m"]
 
@@ -133,9 +131,7 @@ class TestConcatGuards:
         # with nulls, which is the established semantics.
         first = EntityScan("Person", "n").scan(duck)
         second = EntityScan("Widget", "m").scan(duck)
-        combined = concat_binding_frames(
-            duck, [first, second], type_registry={}
-        )
+        combined = concat_binding_frames(duck, [first, second], type_registry={})
         assert combined.is_lazy is False
         assert sorted(combined.bindings.columns) == ["m", "n"]
         assert len(combined) == 5

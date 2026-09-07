@@ -89,22 +89,25 @@ class TestStreamToSink:
         got = pd.read_parquet(out).sort_values("name").reset_index(drop=True)
         assert got["name"].tolist() == ["Alice", "Bob", "Carol"]
 
-    def test_stream_query_to_uri_returns_false_when_ineligible(
+    def test_stream_query_to_uri_raises_when_unsupported(
         self,
         people_parquet,
         tmp_path,
     ) -> None:
+        from pycypher.plan import Unsupported
+
         ctx = _streaming_ctx()
         register_streaming_source(
             ctx, "Person", data_source_from_uri(str(people_parquet))
         )
         out = tmp_path / "x.parquet"
-        # collect() is an unsupported aggregate => ineligible => not streamed.
-        streamed = Star(context=ctx).stream_query_to_uri(
-            "MATCH (n:Person) RETURN collect(n.name) AS names",
-            str(out),
-        )
-        assert streamed is False
+        # collect() has no translation rule; with the engine enabled that is
+        # an error naming the construct, never a silent fallback.
+        with pytest.raises(Unsupported, match="collect"):
+            Star(context=ctx).stream_query_to_uri(
+                "MATCH (n:Person) RETURN collect(n.name) AS names",
+                str(out),
+            )
         assert not out.exists()
 
     def test_stream_query_to_uri_false_when_disabled(

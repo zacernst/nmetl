@@ -324,7 +324,7 @@ class TestBaseRelationPrefersTheRegistry:
 
 
 class TestMultiSourceMerge:
-    """Phase 3c (docs/fastopendata_streaming_qualification_plan.md) -- a
+    """Phase 3c (the FastOpenData streaming-qualification plan (private repository)) -- a
     label registered more than once (as happens for the real fastopendata
     config's Tract/LOCATED_IN/etc.) merges instead of only the last
     registration surviving.
@@ -450,6 +450,43 @@ class TestMultiSourceMerge:
         assert sorted(got["__ID__"]) == [0, 1, 2, 3]
         assert got["__ID__"].is_unique
 
+    def test_relationship_merge_keeps_per_source_endpoint_labels(self):
+        # A declared and an undeclared source merged under one type: each
+        # edge keeps the labels *its* source declared (NULL for none).
+        context = self._ctx()
+        register_streaming_relationship(
+            context,
+            "LOCATED_IN",
+            data_source_from_uri(
+                pd.DataFrame({"unit": ["u1"], "puma": ["p1"]})
+            ),
+            source_col="unit",
+            target_col="puma",
+            source_entity_type="Unit1yr",
+            target_entity_type="PUMA",
+        )
+        register_streaming_relationship(
+            context,
+            "LOCATED_IN",
+            data_source_from_uri(
+                pd.DataFrame({"tract": ["t1"], "county": ["c1"]})
+            ),
+            source_col="tract",
+            target_col="county",
+        )
+        got = context.backend.tables.get(
+            "LOCATED_IN", RELATIONSHIP_KIND
+        ).relation.fetchdf()
+        rows = {
+            r["__SOURCE__"]: (r["__SOURCE_LABEL__"], r["__TARGET_LABEL__"])
+            for _, r in got.iterrows()
+        }
+        assert rows["u1"] == ("Unit1yr", "PUMA")
+        assert pd.isna(rows["t1"][0])
+        assert pd.isna(rows["t1"][1])
+        entry = context.backend.tables.get("LOCATED_IN", RELATIONSHIP_KIND)
+        assert "__SOURCE_LABEL__" not in entry.attr_map
+
     def test_context_builder_merges_entities_across_sources(self):
         ctx = (
             ContextBuilder()
@@ -488,3 +525,83 @@ class TestMultiSourceMerge:
         )
         rel = ctx.relationship_mapping.mapping["LOCATED_IN"]
         assert rel.source_obj.num_rows == 4
+
+
+class TestEntityDedup:
+    """An entity source at a finer grain than the entity (one row per tract
+    defining State, as in the real crosswalk) keeps only the first row per
+    id, matching the eager path -- and does so *before* the Phase 3c merge,
+    which would otherwise fan out to the product of both sides' duplicates.
+    Found on the first real Phase 4 run (2026-09-05): `MATCH (s:State)`
+    returned one row per tract.
+    """
+
+    def _ctx(self) -> Context:
+        context = Context(
+            entity_mapping=EntityMapping(mapping={}),
+            relationship_mapping=RelationshipMapping(mapping={}),
+            backend="duckdb",
+        )
+        context._relation_engine_enabled = True
+        return context
+
+    def test_fresh_registration_keeps_first_row_per_id_and_warns(self):
+        from unittest.mock import patch
+
+        from pycypher.backends import table_registry
+
+        context = self._ctx()
+        df = pd.DataFrame(
+            {
+                "state": ["06", "06", "13", "06"],
+                "tract": ["t1", "t2", "t3", "t4"],
+            }
+        )
+        with patch.object(table_registry.LOGGER, "warning") as warn:
+            register_streaming_source(
+                context, "State", data_source_from_uri(df), id_col="state"
+            )
+        got = context.backend.tables.get("State").relation.fetchdf()
+        assert list(got["state"]) == ["06", "13"]
+        assert list(got["tract"]) == ["t1", "t3"]
+        assert warn.call_count == 1
+        assert warn.call_args.args[1:] == ("State", 2, "state", 4, 2)
+
+    def test_unique_ids_are_left_alone_without_a_warning(self):
+        from unittest.mock import patch
+
+        from pycypher.backends import table_registry
+
+        context = self._ctx()
+        df = pd.DataFrame({"state": ["06", "13"], "name": ["CA", "GA"]})
+        with patch.object(table_registry.LOGGER, "warning") as warn:
+            register_streaming_source(
+                context, "State", data_source_from_uri(df), id_col="state"
+            )
+        got = context.backend.tables.get("State").relation.fetchdf()
+        assert list(got["state"]) == ["06", "13"]
+        assert warn.call_count == 0
+
+    def test_merge_does_not_fan_out_duplicate_ids(self):
+        context = self._ctx()
+        df1 = pd.DataFrame({"tract": ["t1", "t1", "t2"], "a": [1, 2, 3]})
+        df2 = pd.DataFrame({"tract": ["t1", "t1", "t3"], "b": [10, 20, 30]})
+        register_streaming_source(
+            context, "Tract", data_source_from_uri(df1), id_col="tract"
+        )
+        register_streaming_source(
+            context, "Tract", data_source_from_uri(df2), id_col="tract"
+        )
+        got = (
+            context.backend.tables.get("Tract")
+            .relation.fetchdf()
+            .sort_values("tract")
+            .reset_index(drop=True)
+        )
+        assert list(got["tract"]) == ["t1", "t2", "t3"]
+        rows = {r.tract: (r.a, r.b) for r in got.itertuples()}
+        assert rows["t1"] == (1, 10)  # first occurrence on both sides
+        assert rows["t2"][0] == 3
+        assert pd.isna(rows["t2"][1])
+        assert pd.isna(rows["t3"][0])
+        assert rows["t3"][1] == 30

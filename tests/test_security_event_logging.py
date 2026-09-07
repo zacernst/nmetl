@@ -22,7 +22,6 @@ from pycypher.ingestion.security import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-
 @pytest.fixture()
 def _capture_security_logs(caplog):
     """Enable the security logger and capture its output."""

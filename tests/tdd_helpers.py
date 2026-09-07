@@ -63,9 +63,7 @@ class QueryTestCase:
     name: str
     query: str
     entities: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
-    relationships: dict[str, dict[str, list[Any]]] = field(
-        default_factory=dict
-    )
+    relationships: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
     expected_columns: list[str] | None = None
     expected_rows: list[list[Any]] | None = None
     expected_row_count: int | None = None
@@ -261,9 +259,7 @@ def assert_no_api_breakage() -> tuple[set[str], set[str]]:
     """
     from pathlib import Path
 
-    baseline_path = (
-        Path(__file__).parent.parent / "scripts" / "api_surface_baseline.txt"
-    )
+    baseline_path = Path(__file__).parent.parent / "scripts" / "api_surface_baseline.txt"
     import pycypher
 
     current = set(pycypher.__all__)
@@ -280,7 +276,9 @@ def assert_no_api_breakage() -> tuple[set[str], set[str]]:
     removed = baseline - current
     added = current - baseline
 
-    assert not removed, f"API breakage detected! Removed: {sorted(removed)}"
+    assert not removed, (
+        f"API breakage detected! Removed: {sorted(removed)}"
+    )
     return (added, removed)
 
 
@@ -355,9 +353,7 @@ def build_scaled_star(
 
     ctx = Context(
         entity_mapping=EntityMapping(mapping={"Person": person_table}),
-        relationship_mapping=RelationshipMapping(
-            mapping={"KNOWS": knows_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"KNOWS": knows_table}),
     )
     return Star(context=ctx)
 

@@ -113,9 +113,7 @@ class TestPerformanceBenchmarkValidation:
         print("  Uses optimized assign() instead of copy() at star.py:476")
 
         # Queries should complete in reasonable time with correct results
-        assert total_time < perf_threshold(2.0), (
-            "Path queries should be reasonably fast"
-        )
+        assert total_time < perf_threshold(2.0), "Path queries should be reasonably fast"
         print("✓ Variable-length path performance validated")
 
     def test_pattern_matching_performance_improvement(
@@ -153,9 +151,7 @@ class TestPerformanceBenchmarkValidation:
         print("  Uses optimized assign() instead of copy() at star.py:937")
 
         # Queries should complete in reasonable time with correct results
-        assert total_time < perf_threshold(1.0), (
-            "Matching queries should be fast"
-        )
+        assert total_time < perf_threshold(1.0), "Matching queries should be fast"
         print("✓ Pattern matching performance validated")
 
     def test_query_result_assembly_performance_improvement(
@@ -197,9 +193,7 @@ class TestPerformanceBenchmarkValidation:
         )
 
         # Queries should complete in reasonable time with correct results
-        assert total_time < perf_threshold(1.0), (
-            "Result assembly should be fast"
-        )
+        assert total_time < perf_threshold(1.0), "Result assembly should be fast"
         print("✓ Query result assembly performance validated")
 
     def test_comprehensive_performance_comparison(
@@ -250,12 +244,8 @@ class TestPerformanceBenchmarkValidation:
         print(f"  Throughput: {total_results / total_time:.0f} rows/second")
 
         # Performance should be good with optimizations
-        assert total_time < perf_threshold(2.0), (
-            "Total time should be reasonable"
-        )
-        assert avg_time < perf_threshold(0.5), (
-            "Average query time should be fast"
-        )
+        assert total_time < perf_threshold(2.0), "Total time should be reasonable"
+        assert avg_time < perf_threshold(0.5), "Average query time should be fast"
 
         print("✓ Comprehensive performance benchmark successful")
 

@@ -74,7 +74,7 @@ def is_null_raw_list(value: object) -> bool:
     # Scalar pandas null values (NaN, pd.NA, pd.NaT)
     try:
         return bool(pd.isna(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
 
 

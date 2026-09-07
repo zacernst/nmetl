@@ -1,7 +1,7 @@
 """id()/elementId() support in the out-of-core relation engine.
 
 Closes the read-side gap the streaming-eligibility audit found (see
-docs/fastopendata_streaming_qualification_plan.md, Phase 3 finding (4)):
+the FastOpenData streaming-qualification plan (private repository), Phase 3 finding (4)):
 ``relation_sql.compile_expression`` previously had no case for ``id()``/
 ``elementId()`` at all, forcing any query that referenced a node's internal
 ID (e.g. ``RETURN id(c) AS county_fips``) back to the eager pandas engine.
@@ -123,7 +123,9 @@ class TestEligibility:
     def test_id_in_where_clause(self, people_parquet) -> None:
         ctx = _people_ctx(people_parquet)
         assert is_relation_eligible(
-            _ast("MATCH (p:Person) WHERE id(p) = 'p1' RETURN p.name AS name"),
+            _ast(
+                "MATCH (p:Person) WHERE id(p) = 'p1' RETURN p.name AS name"
+            ),
             ctx,
         )
 
@@ -291,5 +293,7 @@ class TestNewColumnStillWorks:
         )
         assert is_relation_eligible(combined_query, ctx)
         out = execute_relation_query(combined_query, ctx)
-        combined_rows = dict(zip(out["puma_fips"], out["household_count"]))
+        combined_rows = dict(
+            zip(out["puma_fips"], out["household_count"])
+        )
         assert combined_rows["P1"] == 2

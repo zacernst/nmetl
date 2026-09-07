@@ -622,7 +622,7 @@ class BindingExpressionEvaluator:
                     # List integer index access: list[0]; row may be list/tuple/ndarray
                     try:
                         return row[int(i)]  # ty: ignore[not-subscriptable, invalid-argument-type]
-                    except IndexError, TypeError:
+                    except (IndexError, TypeError):
                         if _DEBUG_ENABLED:
                             LOGGER.debug(
                                 "Index access failed: row=%r, index=%r",

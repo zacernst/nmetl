@@ -51,14 +51,14 @@ from pycypher.ingestion.security import (
 )
 
 #: URI schemes that indicate a relational / SQL source.
-#: Imported by ``config.py`` for URI validation — single source of truth.
-_SQL_SCHEMES: frozenset[str] = frozenset(
+#: Also used by ``nmetl.config`` for URI validation — single source of truth.
+SQL_SCHEMES: frozenset[str] = frozenset(
     {"postgresql", "postgres", "mysql", "sqlite", "duckdb"},
 )
 
 #: File-extension suffixes that ``data_source_from_uri`` dispatches on.
-#: Imported by ``config.py`` for URI validation — single source of truth.
-_SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(
+#: Also used by ``nmetl.config`` for URI validation — single source of truth.
+SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(
     {".csv", ".parquet", ".json"},
 )
 
@@ -935,7 +935,7 @@ def data_source_from_uri(
     parsed = urlparse(uri)
     scheme = parsed.scheme.lower()
 
-    if scheme in _SQL_SCHEMES:
+    if scheme in SQL_SCHEMES:
         if query is None:
             from pycypher.ingestion.security import mask_uri_credentials
 

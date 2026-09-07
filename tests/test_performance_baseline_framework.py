@@ -37,9 +37,7 @@ class TestProfileHelper:
     def test_sanitize_simple_path(self) -> None:
         from tests.benchmarks.profile_helper import _sanitize_target_name
 
-        result = _sanitize_target_name(
-            "tests/benchmarks/bench_core_operations.py"
-        )
+        result = _sanitize_target_name("tests/benchmarks/bench_core_operations.py")
         assert result == "tests_benchmarks_bench_core_operations"
 
     def test_profile_summary_dataclass(self) -> None:
@@ -84,10 +82,7 @@ class TestWorkloadClassification:
         )
 
         assert classify_benchmark("test_parse_simple_match") == "parser"
-        assert (
-            classify_benchmark("TestParserMicrobenchmarks::test_parse_complex")
-            == "parser"
-        )
+        assert classify_benchmark("TestParserMicrobenchmarks::test_parse_complex") == "parser"
 
     def test_classify_scan(self) -> None:
         from tests.benchmarks.workload_characterization import (
@@ -254,9 +249,7 @@ class TestWorkloadReport:
         path.write_text(json.dumps(data))
         return path
 
-    def test_characterize_workload(
-        self, synthetic_benchmark_file: Path
-    ) -> None:
+    def test_characterize_workload(self, synthetic_benchmark_file: Path) -> None:
         from tests.benchmarks.workload_characterization import (
             characterize_workload,
         )
@@ -336,25 +329,11 @@ class TestPerformanceReportEdgeCases:
             "benchmarks": [
                 {
                     "name": "test_scan_1k",
-                    "stats": {
-                        "mean": 0.01,
-                        "stddev": 0.001,
-                        "rounds": 50,
-                        "min": 0.008,
-                        "max": 0.015,
-                        "median": 0.01,
-                    },
+                    "stats": {"mean": 0.01, "stddev": 0.001, "rounds": 50, "min": 0.008, "max": 0.015, "median": 0.01},
                 },
                 {
                     "name": "test_hop_1k",
-                    "stats": {
-                        "mean": 0.05,
-                        "stddev": 0.005,
-                        "rounds": 30,
-                        "min": 0.04,
-                        "max": 0.07,
-                        "median": 0.05,
-                    },
+                    "stats": {"mean": 0.05, "stddev": 0.005, "rounds": 30, "min": 0.04, "max": 0.07, "median": 0.05},
                 },
             ],
         }
@@ -368,160 +347,66 @@ class TestPerformanceReportEdgeCases:
         current = {
             "commit_info": {"id": "current456"},
             "benchmarks": [
-                {
-                    "name": "test_scan_1k",
-                    "stats": {
-                        "mean": 0.0102,
-                        "stddev": 0.001,
-                        "rounds": 50,
-                        "min": 0.008,
-                        "max": 0.015,
-                        "median": 0.01,
-                    },
-                },
-                {
-                    "name": "test_hop_1k",
-                    "stats": {
-                        "mean": 0.05,
-                        "stddev": 0.005,
-                        "rounds": 30,
-                        "min": 0.04,
-                        "max": 0.07,
-                        "median": 0.05,
-                    },
-                },
+                {"name": "test_scan_1k", "stats": {"mean": 0.0102, "stddev": 0.001, "rounds": 50, "min": 0.008, "max": 0.015, "median": 0.01}},
+                {"name": "test_hop_1k", "stats": {"mean": 0.05, "stddev": 0.005, "rounds": 30, "min": 0.04, "max": 0.07, "median": 0.05}},
             ],
         }
         current_path = tmp_path / "current.json"
         current_path.write_text(json.dumps(current))
 
-        report = compare_benchmarks(
-            baseline_file, current_path, threshold_pct=5.0
-        )
+        report = compare_benchmarks(baseline_file, current_path, threshold_pct=5.0)
         assert report.overall_status == "pass"
         assert len(report.regressions) == 0
 
-    def test_regression_detected(
-        self, baseline_file: Path, tmp_path: Path
-    ) -> None:
+    def test_regression_detected(self, baseline_file: Path, tmp_path: Path) -> None:
         from tests.benchmarks.performance_report import compare_benchmarks
 
         current = {
             "commit_info": {"id": "regress789"},
             "benchmarks": [
-                {
-                    "name": "test_scan_1k",
-                    "stats": {
-                        "mean": 0.02,
-                        "stddev": 0.002,
-                        "rounds": 50,
-                        "min": 0.015,
-                        "max": 0.03,
-                        "median": 0.02,
-                    },
-                },
-                {
-                    "name": "test_hop_1k",
-                    "stats": {
-                        "mean": 0.05,
-                        "stddev": 0.005,
-                        "rounds": 30,
-                        "min": 0.04,
-                        "max": 0.07,
-                        "median": 0.05,
-                    },
-                },
+                {"name": "test_scan_1k", "stats": {"mean": 0.02, "stddev": 0.002, "rounds": 50, "min": 0.015, "max": 0.03, "median": 0.02}},
+                {"name": "test_hop_1k", "stats": {"mean": 0.05, "stddev": 0.005, "rounds": 30, "min": 0.04, "max": 0.07, "median": 0.05}},
             ],
         }
         current_path = tmp_path / "current.json"
         current_path.write_text(json.dumps(current))
 
-        report = compare_benchmarks(
-            baseline_file, current_path, threshold_pct=5.0
-        )
+        report = compare_benchmarks(baseline_file, current_path, threshold_pct=5.0)
         assert report.overall_status == "fail"
         assert len(report.regressions) == 1
         assert report.regressions[0].name == "test_scan_1k"
         assert report.regressions[0].change_pct > 5.0
 
-    def test_new_benchmark_detected(
-        self, baseline_file: Path, tmp_path: Path
-    ) -> None:
+    def test_new_benchmark_detected(self, baseline_file: Path, tmp_path: Path) -> None:
         from tests.benchmarks.performance_report import compare_benchmarks
 
         current = {
             "commit_info": {"id": "new_bench"},
             "benchmarks": [
-                {
-                    "name": "test_scan_1k",
-                    "stats": {
-                        "mean": 0.01,
-                        "stddev": 0.001,
-                        "rounds": 50,
-                        "min": 0.008,
-                        "max": 0.015,
-                        "median": 0.01,
-                    },
-                },
-                {
-                    "name": "test_hop_1k",
-                    "stats": {
-                        "mean": 0.05,
-                        "stddev": 0.005,
-                        "rounds": 30,
-                        "min": 0.04,
-                        "max": 0.07,
-                        "median": 0.05,
-                    },
-                },
-                {
-                    "name": "test_new_feature",
-                    "stats": {
-                        "mean": 0.03,
-                        "stddev": 0.003,
-                        "rounds": 40,
-                        "min": 0.025,
-                        "max": 0.04,
-                        "median": 0.03,
-                    },
-                },
+                {"name": "test_scan_1k", "stats": {"mean": 0.01, "stddev": 0.001, "rounds": 50, "min": 0.008, "max": 0.015, "median": 0.01}},
+                {"name": "test_hop_1k", "stats": {"mean": 0.05, "stddev": 0.005, "rounds": 30, "min": 0.04, "max": 0.07, "median": 0.05}},
+                {"name": "test_new_feature", "stats": {"mean": 0.03, "stddev": 0.003, "rounds": 40, "min": 0.025, "max": 0.04, "median": 0.03}},
             ],
         }
         current_path = tmp_path / "current.json"
         current_path.write_text(json.dumps(current))
 
-        report = compare_benchmarks(
-            baseline_file, current_path, threshold_pct=5.0
-        )
+        report = compare_benchmarks(baseline_file, current_path, threshold_pct=5.0)
         assert "test_new_feature" in report.new_benchmarks
 
-    def test_removed_benchmark_detected(
-        self, baseline_file: Path, tmp_path: Path
-    ) -> None:
+    def test_removed_benchmark_detected(self, baseline_file: Path, tmp_path: Path) -> None:
         from tests.benchmarks.performance_report import compare_benchmarks
 
         current = {
             "commit_info": {"id": "removed"},
             "benchmarks": [
-                {
-                    "name": "test_scan_1k",
-                    "stats": {
-                        "mean": 0.01,
-                        "stddev": 0.001,
-                        "rounds": 50,
-                        "min": 0.008,
-                        "max": 0.015,
-                        "median": 0.01,
-                    },
-                },
+                {"name": "test_scan_1k", "stats": {"mean": 0.01, "stddev": 0.001, "rounds": 50, "min": 0.008, "max": 0.015, "median": 0.01}},
             ],
         }
         current_path = tmp_path / "current.json"
         current_path.write_text(json.dumps(current))
 
-        report = compare_benchmarks(
-            baseline_file, current_path, threshold_pct=5.0
-        )
+        report = compare_benchmarks(baseline_file, current_path, threshold_pct=5.0)
         assert "test_hop_1k" in report.removed_benchmarks
 
 
@@ -533,9 +418,7 @@ class TestPerformanceReportEdgeCases:
 class TestPerfHelpers:
     """Tests for the CI-aware threshold helper."""
 
-    def test_local_threshold_unchanged(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_local_threshold_unchanged(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """On local machines, threshold should pass through unchanged."""
         monkeypatch.delenv("CI", raising=False)
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
@@ -544,15 +427,12 @@ class TestPerfHelpers:
         import importlib
 
         import _perf_helpers
-
         importlib.reload(_perf_helpers)
 
         assert _perf_helpers.perf_threshold(0.5) == 0.5
         assert _perf_helpers.perf_threshold(1.0) == 1.0
 
-    def test_ci_threshold_scaled(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_ci_threshold_scaled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """In CI, threshold should be multiplied by CI multiplier."""
         monkeypatch.setenv("CI", "true")
         monkeypatch.setenv("PYCYPHER_PERF_MULTIPLIER", "3.0")
@@ -561,15 +441,12 @@ class TestPerfHelpers:
         import importlib
 
         import _perf_helpers
-
         importlib.reload(_perf_helpers)
 
         assert _perf_helpers.perf_threshold(0.5) == 1.5
         assert _perf_helpers.perf_threshold(1.0) == 3.0
 
-    def test_xdist_threshold_scaled(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_xdist_threshold_scaled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Under xdist, threshold should use xdist multiplier."""
         monkeypatch.delenv("CI", raising=False)
         monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
@@ -578,7 +455,6 @@ class TestPerfHelpers:
         import importlib
 
         import _perf_helpers
-
         importlib.reload(_perf_helpers)
 
         assert _perf_helpers.perf_threshold(0.5) == 1.0

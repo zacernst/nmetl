@@ -69,7 +69,7 @@ def _read_message() -> dict[str, Any] | None:
         if line_str.startswith("Content-Length:"):
             try:
                 content_length = int(line_str.split(":")[1].strip())
-            except ValueError, IndexError:
+            except (ValueError, IndexError):
                 LOGGER.warning("Malformed Content-Length header: %r", line_str)
                 return None
             if content_length < 0 or content_length > _MAX_CONTENT_LENGTH:
@@ -164,7 +164,7 @@ def _extract_variable_bindings(text: str) -> dict[str, tuple[int, int]]:
         if ast is None:
             return {}
         _collect_binding_names(ast, binding_names)
-    except SyntaxError, ValueError, KeyError, AttributeError, ImportError:
+    except (SyntaxError, ValueError, KeyError, AttributeError, ImportError):
         LOGGER.debug("Go-to-definition: parse failed", exc_info=True)
         return {}
 
@@ -375,7 +375,7 @@ def _publish_diagnostics(uri: str, text: str) -> None:
                         "message": str(err),
                     },
                 )
-        except ValueError, TypeError, KeyError, AttributeError, ImportError:
+        except (ValueError, TypeError, KeyError, AttributeError, ImportError):
             LOGGER.debug(
                 "Semantic validation failed for %s",
                 uri,
@@ -532,7 +532,7 @@ def _get_completions() -> list[dict[str, Any]]:
                     "insertTextFormat": 2,  # Snippet
                 },
             )
-    except ImportError, AttributeError, KeyError:
+    except (ImportError, AttributeError, KeyError):
         LOGGER.debug(
             "Scalar function registry introspection failed",
             exc_info=True,
@@ -738,7 +738,7 @@ def _handle_hover(
                 md += f"```\n{meta.example}\n```"
 
             return {"contents": {"kind": "markdown", "value": md}}
-    except ImportError, AttributeError, KeyError:
+    except (ImportError, AttributeError, KeyError):
         LOGGER.debug("Hover: scalar function lookup failed", exc_info=True)
 
     # Check aggregate functions
@@ -801,7 +801,7 @@ def _handle_signature_help(
                     "value": meta.description,
                 }
             signatures.append(sig)
-    except ImportError, AttributeError, KeyError:
+    except (ImportError, AttributeError, KeyError):
         LOGGER.debug("SignatureHelp: scalar lookup failed", exc_info=True)
 
     # Check aggregate functions

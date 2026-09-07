@@ -22,8 +22,8 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 from pycypher.ast_models import Literal, Variable
-from pycypher.binding_evaluator import BindingExpressionEvaluator
 from pycypher.binding_frame import PATH_HOP_COLUMN_PREFIX, BindingFrame
+from pycypher.binding_evaluator import BindingExpressionEvaluator
 from pycypher.scalar_function_evaluator import ScalarFunctionEvaluator
 from pycypher.star import Star
 
@@ -36,9 +36,7 @@ class TestScalarFunctionEvaluatorUnit:
         minimal_binding_frame: BindingFrame,
     ) -> None:
         """Test ScalarFunctionEvaluator can be instantiated with a binding frame."""
-        evaluator = ScalarFunctionEvaluator(
-            minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = ScalarFunctionEvaluator(minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator)
 
         assert evaluator.frame is minimal_binding_frame
         assert hasattr(evaluator, "evaluate_scalar_function")
@@ -48,9 +46,7 @@ class TestScalarFunctionEvaluatorUnit:
         minimal_binding_frame: BindingFrame,
     ) -> None:
         """Test that the frame reference is stored correctly and remains consistent."""
-        evaluator = ScalarFunctionEvaluator(
-            minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = ScalarFunctionEvaluator(minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator)
         original_frame = evaluator.frame
 
         # Frame reference should remain the same
@@ -210,9 +206,7 @@ class TestPathLengthFunction:
             },
         )
 
-        evaluator = ScalarFunctionEvaluator(
-            mock_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = ScalarFunctionEvaluator(mock_frame, evaluator_factory=BindingExpressionEvaluator)
 
         # Mock Variable for path argument
         path_var = Variable(name="mypath")
@@ -435,9 +429,7 @@ class TestErrorHandling:
         mock_frame = Mock()
         mock_frame.bindings = pd.DataFrame({"other_col": [1, 2, 3]})
 
-        evaluator = ScalarFunctionEvaluator(
-            mock_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = ScalarFunctionEvaluator(mock_frame, evaluator_factory=BindingExpressionEvaluator)
         path_var = Variable(name="missing_path")
 
         # Should fall through since hop column doesn't exist
@@ -597,6 +589,4 @@ def minimal_scalar_evaluator(
     minimal_binding_frame: BindingFrame,
 ) -> ScalarFunctionEvaluator:
     """Create a minimal ScalarFunctionEvaluator for testing."""
-    return ScalarFunctionEvaluator(
-        minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator
-    )
+    return ScalarFunctionEvaluator(minimal_binding_frame, evaluator_factory=BindingExpressionEvaluator)

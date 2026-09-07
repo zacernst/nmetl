@@ -1,0 +1,121 @@
+services:
+  # Main pycypher development container
+  pycypher-dev:
+    container_name: pycypher-dev
+    # platform auto-detected; override with DOCKER_DEFAULT_PLATFORM if needed
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Rootless Podman only maps container UID 0 to the host user by default;
+    # other UIDs (e.g. the `developer` UID 1000 this image runs as) land in
+    # the subuid range and can't write the .:/workspace bind mount, so
+    # `uv sync` fails to create /workspace/.venv. keep-id maps container
+    # UID 1000 back to the real host UID. No-op under Docker.
+    userns_mode: "keep-id"
+    working_dir: /workspace
+    volumes:
+      # Mount entire project for monorepo development
+      - .:/workspace
+      # Cache uv packages to speed up rebuilds
+      - uv-cache:/root/.cache/uv
+      # Cache pytest
+      - pytest-cache:/workspace/.pytest_cache
+    healthcheck:
+      test: ["CMD", "uv", "run", "nmetl", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # allow time for uv sync
+    environment:
+      # Python environment
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - LC_ALL=C.UTF-8
+      - LANG=C.UTF-8
+      # GitHub token for private dependencies (if needed)
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      # Spark cluster
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYSPARK_PYTHON=/usr/bin/python3
+      - SPARK_EVENTS_DIR=/opt/bitnami/spark/spark-events
+    # No depends_on: pycypher-dev must boot standalone (`make dev-up`) without
+    # pulling in Spark. It shares pycypher-dev-network with the Spark services,
+    # so it can reach them by name whenever they're started separately
+    # (make spark-up / infra-up).
+    command: >
+      bash -c "
+        echo 'Installing pycypher in development mode...' &&
+        cd /workspace &&
+        uv sync &&
+        uv pip install -e packages/pycypher -e packages/nmetl &&
+        tail -f /dev/null
+      "
+    stdin_open: true
+    tty: true
+
+  # Optional: VSCode server for browser-based development
+  code-server:
+    container_name: pycypher-code-server
+    image: codercom/code-server:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+      - code-server-data:/root/.local/share/code-server
+    environment:
+      - PASSWORD=${CODE_SERVER_PASSWORD:?Set CODE_SERVER_PASSWORD in .env}
+    working_dir: /workspace
+    command: --auth password --bind-addr 0.0.0.0:8080 /workspace
+    profiles:
+      - code-server
+
+  spark-master:
+    container_name: pycypher-spark-master
+    image: bitnamilegacy/spark:3.5
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=yes
+      - SPARK_RPC_AUTHENTICATION_SECRET=${SPARK_RPC_SECRET:?Set SPARK_RPC_SECRET in .env}
+      - SPARK_RPC_ENCRYPTION_ENABLED=yes
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=yes
+      - SPARK_SSL_ENABLED=no
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "7077:7077"
+      - "8090:8080"
+    volumes:
+      - spark-events:/opt/bitnami/spark/spark-events
+
+  spark-worker:
+    container_name: pycypher-spark-worker
+    image: bitnamilegacy/spark:3.5
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=yes
+      - SPARK_RPC_AUTHENTICATION_SECRET=${SPARK_RPC_SECRET:?Set SPARK_RPC_SECRET in .env}
+      - SPARK_RPC_ENCRYPTION_ENABLED=yes
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=yes
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8091:8081"
+    volumes:
+      - spark-events:/opt/bitnami/spark/spark-events
+
+volumes:
+  uv-cache:
+    driver: local
+  pytest-cache:
+    driver: local
+  code-server-data:
+    driver: local
+  spark-events:
+    driver: local
+
+networks:
+  default:
+    name: pycypher-dev-network

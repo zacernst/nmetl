@@ -209,6 +209,7 @@ class TestExpressionTransformer:
         assert result == {"type": "PropertyLookup", "property": "name"}
 
 
+
 # ---------------------------------------------------------------------------
 # PatternTransformer
 # ---------------------------------------------------------------------------
@@ -255,6 +256,7 @@ class TestPatternTransformer:
 
     def test_property_name(self) -> None:
         assert self.t.property_name(["age"]) == "age"
+
 
 
 # ---------------------------------------------------------------------------

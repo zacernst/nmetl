@@ -191,7 +191,7 @@ class TestUndefinedVariables:
             result = parse_and_validate(query, parser, converter)
             # If it parses, validation should work
             assert isinstance(result, ValidationResult)
-        except AttributeError, KeyError:
+        except (AttributeError, KeyError):
             # UNWIND may not be fully supported yet
             pytest.skip("UNWIND not fully supported in converter")
 

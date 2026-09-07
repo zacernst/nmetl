@@ -30,53 +30,14 @@ _identifiers = st.text(
     alphabet=string.ascii_letters + "_",
     min_size=1,
     max_size=8,
-).filter(
-    lambda s: (
-        s[0].isalpha()
-        and s.upper()
-        not in {
-            "MATCH",
-            "RETURN",
-            "WHERE",
-            "WITH",
-            "ORDER",
-            "BY",
-            "LIMIT",
-            "SKIP",
-            "AS",
-            "AND",
-            "OR",
-            "NOT",
-            "NULL",
-            "TRUE",
-            "FALSE",
-            "CREATE",
-            "DELETE",
-            "SET",
-            "REMOVE",
-            "MERGE",
-            "UNWIND",
-            "DISTINCT",
-            "OPTIONAL",
-            "CALL",
-            "YIELD",
-            "UNION",
-            "DESC",
-            "ASC",
-            "IN",
-            "IS",
-            "STARTS",
-            "ENDS",
-            "CONTAINS",
-            "EXISTS",
-            "CASE",
-            "WHEN",
-            "THEN",
-            "ELSE",
-            "END",
-        }
-    )
-)
+).filter(lambda s: s[0].isalpha() and s.upper() not in {
+    "MATCH", "RETURN", "WHERE", "WITH", "ORDER", "BY", "LIMIT",
+    "SKIP", "AS", "AND", "OR", "NOT", "NULL", "TRUE", "FALSE",
+    "CREATE", "DELETE", "SET", "REMOVE", "MERGE", "UNWIND",
+    "DISTINCT", "OPTIONAL", "CALL", "YIELD", "UNION", "DESC", "ASC",
+    "IN", "IS", "STARTS", "ENDS", "CONTAINS", "EXISTS", "CASE",
+    "WHEN", "THEN", "ELSE", "END",
+})
 
 _labels = st.text(
     alphabet=string.ascii_letters,
@@ -126,9 +87,7 @@ class TestParserNoCrash:
         limit=st.integers(min_value=1, max_value=1000),
     )
     @SETTINGS
-    def test_match_return_limit(
-        self, label: str, var: str, limit: int
-    ) -> None:
+    def test_match_return_limit(self, label: str, var: str, limit: int) -> None:
         """MATCH RETURN LIMIT parses."""
         q = f"MATCH ({var}:{label}) RETURN {var} LIMIT {limit}"
         ast = _parser.parse_to_ast(q)
@@ -181,9 +140,7 @@ class TestWhitespaceInsensitivity:
 
     @given(label=_labels, var=_identifiers)
     @SETTINGS
-    def test_newlines_treated_as_whitespace(
-        self, label: str, var: str
-    ) -> None:
+    def test_newlines_treated_as_whitespace(self, label: str, var: str) -> None:
         """Newlines between clauses parse correctly."""
         q = f"MATCH ({var}:{label})\nRETURN {var}"
         ast = _parser.parse_to_ast(q)
@@ -231,9 +188,7 @@ class TestASTStructure:
 
     @given(label=_labels, var=_identifiers, prop=_properties)
     @SETTINGS
-    def test_match_return_has_clauses(
-        self, label: str, var: str, prop: str
-    ) -> None:
+    def test_match_return_has_clauses(self, label: str, var: str, prop: str) -> None:
         """Parsed MATCH...RETURN has both clauses in AST."""
         q = f"MATCH ({var}:{label}) RETURN {var}.{prop}"
         ast = _parser.parse_to_ast(q)

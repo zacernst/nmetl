@@ -17,8 +17,6 @@ dependencies = [
     "pandas>=3.0.0,<4.0.0",
     "pyarrow>=18.0.0,<25.0.0",
     "duckdb>=1.5.2,<2.0.0",
-    "pyyaml>=6.0.0,<7.0.0",
-    "click>=8.3.3,<9.0.0",
     "numpy>=2.0.0,<3.0.0",
 ]
 
@@ -56,5 +54,3 @@ all = [
 [project.urls]
 Homepage = "https://github.com/zacernst/pycypher"
 
-[project.scripts]
-nmetl = "pycypher.nmetl_cli:main"

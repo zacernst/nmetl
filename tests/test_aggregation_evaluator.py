@@ -309,15 +309,11 @@ class TestAggregationExpressionEvaluator:
         test_frame: BindingFrame,
     ) -> AggregationExpressionEvaluator:
         """Create AggregationExpressionEvaluator instance."""
-        return AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        return AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
 
     def test_evaluator_initialization(self, test_frame: BindingFrame) -> None:
         """Test evaluator initializes correctly."""
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         assert evaluator.frame is test_frame
 
 
@@ -358,9 +354,7 @@ class TestCountStarEvaluation:
         """Test COUNT(*) returns frame length."""
         count_star = CountStar()
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         result = evaluator.evaluate_aggregation(count_star, None)
         assert result == 4  # Length of test frame
 
@@ -418,9 +412,7 @@ class TestFunctionInvocationEvaluation:
                     return pd.Series([50000, 60000, None, 80000, 90000])
                 return pd.Series([0, 0, 0, 0, 0])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(sum_function, mock_evaluator)
 
@@ -441,9 +433,7 @@ class TestFunctionInvocationEvaluation:
                     return pd.Series([50000, 60000, None, 80000, 90000])
                 return pd.Series([0, 0, 0, 0, 0])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(count_function, mock_evaluator)
 
@@ -454,9 +444,7 @@ class TestFunctionInvocationEvaluation:
         """Test COUNT() without expression - equivalent to COUNT(*)."""
         count_function = FunctionInvocation(name="count", arguments=None)
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         result = evaluator.evaluate_aggregation(count_function, None)
 
         # COUNT() should return frame length
@@ -477,9 +465,7 @@ class TestFunctionInvocationEvaluation:
             def evaluate(expr):
                 return pd.Series([1, 2, 3, 4, 5])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
 
         # Import the expected exception
@@ -547,9 +533,7 @@ class TestDistinctAggregation:
                     )  # Duplicates: should sum to 1+2+3=6
                 return pd.Series([0, 0, 0, 0, 0])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(
             sum_distinct_function,
@@ -614,9 +598,7 @@ class TestPercentileAggregations:
                     return pd.Series([0.5])
                 return pd.Series([0])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(
             percentile_cont_function,
@@ -645,9 +627,7 @@ class TestPercentileAggregations:
                     return pd.Series([0.5])
                 return pd.Series([0])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(
             percentile_disc_function,
@@ -675,9 +655,7 @@ class TestPercentileAggregations:
             def evaluate(expr):
                 return pd.Series([10, 20, 30, 40, 50])
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
 
         from pycypher.exceptions import FunctionArgumentError
@@ -731,9 +709,7 @@ class TestGroupedAggregation:
             },
         )
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         result = evaluator.evaluate_aggregation_grouped(
             count_star,
             group_df,
@@ -768,9 +744,7 @@ class TestGroupedAggregation:
             },
         )
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation_grouped(
             sum_function,
@@ -809,9 +783,7 @@ class TestGroupedAggregation:
             },
         )
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation_grouped(
             unsupported_function,
@@ -874,9 +846,7 @@ class TestArithmeticInAggregation:
                     return expr.value
                 return 0
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(
             arithmetic_expr,
@@ -903,9 +873,7 @@ class TestArithmeticInAggregation:
             def _eval_as_scalar(self, expr):
                 return expr.value
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
         result = evaluator.evaluate_aggregation(division_expr, mock_evaluator)
 
@@ -929,9 +897,7 @@ class TestArithmeticInAggregation:
             def _eval_as_scalar(self, expr):
                 return expr.value
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
         mock_evaluator = MockExpressionEvaluator()
 
         with pytest.raises(TypeError, match="Operator '@' incompatible"):
@@ -965,9 +931,7 @@ class TestErrorHandling:
         class InvalidExpression:
             pass
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
 
         with pytest.raises(
             ValueError,
@@ -982,9 +946,7 @@ class TestErrorHandling:
         """Test aggregation without required argument raises ValueError."""
         sum_function = FunctionInvocation(name="sum", arguments=None)
 
-        evaluator = AggregationExpressionEvaluator(
-            test_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = AggregationExpressionEvaluator(test_frame, evaluator_factory=BindingExpressionEvaluator)
 
         from pycypher.exceptions import FunctionArgumentError
 

@@ -15,9 +15,7 @@ _CI_PERF_MULTIPLIER = float(os.environ.get("PYCYPHER_PERF_MULTIPLIER", "3.0"))
 _IN_CI = os.environ.get("CI", "").lower() in ("true", "1", "yes")
 # pytest-xdist sets PYTEST_XDIST_WORKER on worker processes
 _IN_XDIST = "PYTEST_XDIST_WORKER" in os.environ
-_XDIST_PERF_MULTIPLIER = float(
-    os.environ.get("PYCYPHER_XDIST_PERF_MULTIPLIER", "2.0")
-)
+_XDIST_PERF_MULTIPLIER = float(os.environ.get("PYCYPHER_XDIST_PERF_MULTIPLIER", "2.0"))
 
 
 def perf_threshold(seconds: float) -> float:

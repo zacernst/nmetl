@@ -345,7 +345,7 @@ class ContextBuilder:
                     "no DuckDB table registry; falling back to an eager, "
                     "fully in-memory read of this source. This may exceed "
                     "available memory on large datasets. (See "
-                    "docs/fastopendata_streaming_qualification_plan.md, "
+                    "the FastOpenData streaming-qualification plan (private repository), "
                     "'Phase 0'.)",
                     entity_type,
                 )

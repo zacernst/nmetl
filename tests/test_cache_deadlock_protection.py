@@ -180,8 +180,7 @@ class TestLockTimeoutBehaviour:
         cache._rwlock.release_write()
 
     def test_get_returns_none_on_lock_timeout(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         cache = ResultCache(lock_timeout_seconds=0.1)
         cache.put("RETURN 1", None, sample_df)
@@ -198,8 +197,7 @@ class TestLockTimeoutBehaviour:
             self._release_write_lock(cache)
 
     def test_put_skips_silently_on_lock_timeout(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         cache = ResultCache(lock_timeout_seconds=0.1)
 
@@ -232,8 +230,7 @@ class TestLockTimeoutBehaviour:
         assert cache._generation == gen_before
 
     def test_clear_skips_on_lock_timeout(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         cache = ResultCache(lock_timeout_seconds=0.1)
         cache.put("RETURN 1", None, sample_df)
@@ -251,8 +248,7 @@ class TestLockTimeoutBehaviour:
         assert cache.get("RETURN 1", None) is not None
 
     def test_stats_returns_best_effort_on_lock_timeout(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         cache = ResultCache(lock_timeout_seconds=0.1)
         cache.put("RETURN 1", None, sample_df)
@@ -315,8 +311,7 @@ class TestCustomLockTimeout:
         assert cache._base_lock_timeout == 10.0
 
     def test_zero_timeout_is_nonblocking(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """Zero timeout means try-lock: fail immediately if contended."""
         cache = ResultCache(lock_timeout_seconds=0)
@@ -354,9 +349,7 @@ class TestDeadlockDetection:
         original_put = cache.put
 
         def instrumented_put(
-            q: str,
-            p: dict | None,
-            r: pd.DataFrame,
+            q: str, p: dict | None, r: pd.DataFrame,
         ) -> None:
             # We need to check owner while lock is held, so instrument
             # by running put in a thread and checking from outside.
@@ -401,8 +394,7 @@ class TestAtomicInvalidation:
         assert cache._generation == gen0 + 1
 
     def test_stale_entries_evicted_on_get(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """After invalidation, cached entries return None on get."""
         cache = ResultCache()
@@ -442,8 +434,7 @@ class TestConcurrentAccess:
     """Verify no deadlock or data corruption under concurrent access."""
 
     def test_concurrent_put_get_no_deadlock(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """Multiple threads doing put/get don't deadlock."""
         cache = ResultCache(lock_timeout_seconds=2.0)
@@ -481,8 +472,7 @@ class TestConcurrentAccess:
         assert not errors, f"Thread errors: {errors}"
 
     def test_concurrent_mixed_operations(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """Mixed put/get/invalidate/stats/clear under heavy contention."""
         cache = ResultCache(lock_timeout_seconds=2.0)
@@ -506,7 +496,8 @@ class TestConcurrentAccess:
                 errors.append(f"worker {thread_id}: {e}")
 
         threads = [
-            threading.Thread(target=mixed_worker, args=(i,)) for i in range(8)
+            threading.Thread(target=mixed_worker, args=(i,))
+            for i in range(8)
         ]
 
         start = time.monotonic()
@@ -536,7 +527,9 @@ class TestConcurrentAccess:
             except Exception as e:
                 errors.append(str(e))
 
-        threads = [threading.Thread(target=stats_reader) for _ in range(4)]
+        threads = [
+            threading.Thread(target=stats_reader) for _ in range(4)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -546,8 +539,7 @@ class TestConcurrentAccess:
         assert len(results) == 4
 
     def test_size_tracking_consistent_under_contention(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """Size tracking remains consistent under concurrent writes."""
         cache = ResultCache(
@@ -579,8 +571,7 @@ class TestConcurrentAccess:
         assert s["result_cache_entries"] == len(cache._entries)
 
     def test_high_contention_100_threads(
-        self,
-        sample_df: pd.DataFrame,
+        self, sample_df: pd.DataFrame,
     ) -> None:
         """100+ concurrent threads doing mixed ops must not deadlock."""
         cache = ResultCache(lock_timeout_seconds=5.0)

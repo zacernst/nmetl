@@ -1,4 +1,4 @@
-# PyCypher Makefile
+# PyCypher + nmetl Makefile
 # ------------------------------------------------------------------------------
 # Configuration variables
 PYTHON_VERSION = 3.14
@@ -15,18 +15,9 @@ export PROJECT_ROOT := ${PWD}
 export PACKAGES_DIR := ${PROJECT_ROOT}/packages
 # Package-specific paths
 export PYCYPHER_DIR := ${PACKAGES_DIR}/pycypher
+export NMETL_DIR := ${PACKAGES_DIR}/nmetl
 export SHARED_DIR := ${PACKAGES_DIR}/shared
 export LC_ALL := C
-export DATA_DIR := /run/media/zac/passport/fastopendata/data#:quality:xdg-open/home/zac/scratch/data# /mnt/2tb/fastopendata/data
-export SAMPLE_DATA_DIR := ${DATA_DIR}/sample_data
-export NOMINATIM_PGDATA_DIR := $(dir ${DATA_DIR})nominatim-postgres
-# The Nominatim PGDATA dir is mode 0700 owned by the container's postgres user
-# (UID 101). Under rootless podman that UID lands in the host subuid range
-# (e.g. 524388), so a plain host-side `stat`/`test -f` sees the wrong owner and
-# can't read inside the directory at all. `podman unshare` runs the check inside
-# the user namespace, where the IDs and permissions match what the container
-# sees. Under Docker the container UID is the host UID, so no prefix is needed.
-NS := $(if $(filter podman,$(DOCKER)),${DOCKER} unshare,)
 
 # Documentation paths
 export DOCS_DIR := ${PROJECT_ROOT}/docs
@@ -36,10 +27,10 @@ export TESTS_DIR := ${PROJECT_ROOT}/tests
 export COVERAGE_DIR := ${PROJECT_ROOT}/coverage_report
 
 # Main targets
-.PHONY: help pycypher test tests docs lsp clean veryclean venv uv start format lint lint-changed audit typecheck coverage coverage-check check setup test-file test-find test-k test-mark watch reset lock-check dev-check bench bench-save bench-compare bench-memory metrics-snapshot metrics-prometheus test-telemetry dev-up dev-up-minimal dev-up-full dev-up-api dev-down dev-shell dev-rebuild dev-logs dev-test dev-typecheck dev-format spark-up spark-down spark-logs spark-ui spark-shell spark-scale infra-up infra-down test-spark fod-up fod-down fod-shell fod-logs fod-rebuild fod-api-up fod-api-down fod-api-shell fod-api-logs fod-api-rebuild fod-site nominatim-up nominatim-down nominatim-logs nominatim-search nominatim-status fod-data fod-data-plan fod-data-census fod-data-tiger fod-data-osm fod-data-wikidata fod-data-status fod-data-clean import-cycles import-cycles-ratchet
+.PHONY: help pycypher nmetl test tests docs lsp clean veryclean venv uv start format lint lint-changed audit typecheck coverage coverage-check check setup test-file test-find test-k test-mark watch reset lock-check dev-check bench bench-save bench-compare bench-memory metrics-snapshot metrics-prometheus test-telemetry dev-up dev-up-minimal dev-up-full dev-down dev-shell dev-rebuild dev-logs dev-test dev-typecheck dev-format spark-up spark-down spark-logs spark-ui spark-shell spark-scale infra-up infra-down test-spark import-cycles import-cycles-ratchet
 
 # Default target - run the complete build process
-all: clean venv format pycypher 
+all: clean venv format pycypher docs
 
 ## Show available targets with descriptions
 help:
@@ -51,6 +42,7 @@ help:
 	@echo "  make venv            Create virtual environment"
 	@echo "  make build           Build wheel package s"
 	@echo "  make pycypher        Build and install pycypher package"
+	@echo "  make nmetl           Build and install nmetl package (depends on pycypher)"
 	@echo "  make format          Run ruff import sorting + format"
 	@echo "  make all             Full rebuild (veryclean + venv + format + pycypher)"
 	@echo ""
@@ -89,13 +81,9 @@ help:
 	@echo "  make complexity      Show complexity hotspots only"
 	@echo "  make quality-changed Quality check on changed files only"
 	@echo ""
-	@echo "FastOpenData site (local):"
-	@echo "  make fod-site        Run API + site locally at http://localhost:8000/site/"
-	@echo "                       Override port: make fod-site FOD_SITE_PORT=9000"
-	@echo ""
 	@echo "Docker Development:"
 	@echo "  make dev-up          Start dev container only (fast; attach VS Code to it)"
-	@echo "  make dev-up-full     Start dev container + Spark + Nominatim + FastOpenData"
+	@echo "  make dev-up-full     Start dev container + Spark"
 	@echo "  make dev-down        Stop all containers"
 	@echo "  make dev-shell       Open shell in dev container"
 	@echo "  make dev-rebuild     Rebuild and restart dev container"
@@ -119,9 +107,6 @@ help:
 	@echo "  make test-spark      Run Spark tests (requires dev container)"
 	@echo "  make test-large-dataset Run large-dataset tests (timeout=120s)"
 	@echo "  make test-backends   Run backend equivalence tests (timeout=60s)"
-	@echo ""
-	@echo "Data Downloads (Snakemake):"
-	@echo "  make fod-data          Download all fastopendata datasets"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  make docs            Build Sphinx documentation"
@@ -188,14 +173,9 @@ clean:
 	rm -rfv ${COVERAGE_DIR}
 
 test:
-	uv run pytest -n ${PYTHON_TEST_THREADS} tests/ && \
-	uv run pytest -n ${PYTHON_TEST_THREADS} packages/fastopendata/tests/
+	uv run pytest -n ${PYTHON_TEST_THREADS}
 
 tests: test
-
-# TUI development is suspended; run explicitly until it resumes.
-test-tui:
-	uv run pytest packages/pycypher-tui/tests/
 
 test-fast:
 	uv run pytest -n auto -x -m "not slow" --ignore=tests/load_testing --ignore=tests/large_dataset .
@@ -297,8 +277,6 @@ test-telemetry:
 # ------------------------------------------------------------------------------
 # Code quality targets (local equivalents of CI checks)
 
-
-
 lint:
 	@echo "Running linters..."
 	uv run ruff check --select I .
@@ -320,7 +298,7 @@ audit:
 # Configuration in pyproject.toml [tool.bandit].
 sast:
 	@echo "Running SAST scan (bandit)..."
-	uv run bandit -r packages/pycypher/src/ packages/shared/src/ \
+	uv run bandit -r packages/pycypher/src/ packages/nmetl/src/ packages/shared/src/ \
 		-c pyproject.toml --severity-level medium -f txt
 
 # Combined security scan: dependencies + code
@@ -459,12 +437,9 @@ watch:
 # ------------------------------------------------------------------------------
 # Docker development targets
 
-# Start only the dev container — fast, no Spark/Nominatim/FastOpenData.
-# Those are heavy (image pulls, Nominatim's multi-hour OSM import, a DATA_DIR
-# bind mount that may not be attached) and bringing them all up together via
-# a bare `docker compose up -d` is what used to make dev-up time out. The dev
-# container still joins pycypher-dev-network, so it can reach any of those
-# services by name once they're started separately.
+# Start only the dev container — fast, no Spark. The dev container still
+# joins pycypher-dev-network, so it can reach Spark by service name once
+# that is started separately (make spark-up).
 dev-up: dev-check
 	@echo "Starting pycypher dev container..."
 	${DOCKER} compose up -d --no-deps pycypher-dev
@@ -473,25 +448,18 @@ dev-up: dev-check
 	@echo "  Shell:   make dev-shell"
 	@echo "  VS Code: Cmd/Ctrl+Shift+P -> \"Dev Containers: Attach to Running Container\" -> pycypher-dev"
 	@echo "           (or \"Dev Containers: Reopen in Container\" — see .devcontainer/devcontainer.json)"
-	@echo "  Full stack (+ Spark + Nominatim + FastOpenData): make dev-up-full"
+	@echo "  Full stack (+ Spark): make dev-up-full"
 
 # Alias retained for anyone with dev-up-minimal in muscle memory — identical
 # to dev-up now that dev-up itself is the lean target.
 dev-up-minimal: dev-up
 
-# Start the full stack: dev container + Spark + Nominatim + FastOpenData.
-# Requires DATA_DIR to point at a mounted, existing directory (Nominatim/
-# FastOpenData bind-mount it) — see the Makefile export and .env.example.
+# Start the full stack: dev container + Spark.
 dev-up-full: dev-check
-	@echo "Starting full pycypher stack (dev + Spark + Nominatim + FastOpenData)..."
+	@echo "Starting full pycypher stack (dev + Spark)..."
 	${DOCKER} compose up -d
 	@echo "  pycypher-dev : make dev-shell"
 	@echo "  Spark UI     : http://localhost:8090"
-
-# Start the dev container + FastOpenData API + Nominatim — the subset of
-# dev-up-full needed to develop against the API without paying for Spark or
-# the fastopendata (Snakemake) dev container.
-dev-up-api: dev-up fod-api-up nominatim-up
 
 # Stop all containers
 dev-down:
@@ -543,94 +511,7 @@ dev-format:
 	${DOCKER} compose exec pycypher-dev bash -c "cd /workspace && uv run ruff format packages/pycypher/"
 
 # ------------------------------------------------------------------------------
-# Nominatim geocoder targets
-#
-# IMPORTANT — first-start import time:
-#   Importing the full US OSM extract takes several hours and ~32 GB of RAM.
-#   The PBF must already exist at:
-#     packages/fastopendata/raw_data/us-latest.osm.pbf
-#   Run `make fod-shell` then download it per DATASETS.md #16 before starting
-#   Nominatim for the first time.  Subsequent starts skip the import.
-
-nominatim-up:
-	@mkdir -p "${DATA_DIR}" "${NOMINATIM_PGDATA_DIR}"
-	@# start.sh in mediagis/nominatim:4.4 re-imports if and only if
-	@# ${NOMINATIM_PGDATA_DIR}/import-finished is absent, so report which of the
-	@# two very different things this run is about to do rather than always
-	@# warning about a multi-hour import.
-	@if ${NS} test -f "${NOMINATIM_PGDATA_DIR}/import-finished"; then \
-		echo "Starting Nominatim — existing import found in ${NOMINATIM_PGDATA_DIR}, no re-import."; \
-	else \
-		echo "Starting Nominatim — no import-finished marker in ${NOMINATIM_PGDATA_DIR}," \
-			"so this run performs a FULL OSM import (several hours, ~32 GB RAM — see DATASETS.md #16)."; \
-	fi
-	@if ${NS} test -f "${NOMINATIM_PGDATA_DIR}/PG_VERSION"; then \
-		pg_owner_uid=$$(${NS} stat -c '%u' "${NOMINATIM_PGDATA_DIR}"); \
-		if [ "$$pg_owner_uid" != "101" ]; then \
-			echo "ERROR: ${NOMINATIM_PGDATA_DIR} already contains a Postgres cluster" \
-				"(PG_VERSION present) but is owned by UID $$pg_owner_uid, not 101" \
-				"(the postgres user inside mediagis/nominatim:4.4)."; \
-			echo "The container's init.sh only chowns this directory to postgres:postgres" \
-				"when initializing a brand-new cluster (no PG_VERSION yet) — an existing" \
-				"cluster with the wrong owner makes pg_ctlcluster refuse to start postgres," \
-				"which then fails createuser/createdb with a missing-socket error."; \
-			echo "Fix before retrying:"; \
-			echo "  ${DOCKER} run --rm -v \"${NOMINATIM_PGDATA_DIR}\":/data mediagis/nominatim:4.4 chown -R postgres:postgres /data"; \
-			exit 1; \
-		fi; \
-	fi
-	@if [ -f "${DATA_DIR}/us-latest.osm.pbf" ]; then \
-		echo "Found existing PBF at ${DATA_DIR}/us-latest.osm.pbf — Nominatim will reuse it (no download)."; \
-	else \
-		echo "WARNING: ${DATA_DIR}/us-latest.osm.pbf not found. Nominatim will fail to import" \
-			"until it exists (see 'make fod-shell' + DATASETS.md #16, or 'make fod-data-osm')."; \
-	fi
-	${DOCKER} compose up -d nominatim
-
-nominatim-down:
-	${DOCKER} compose stop nominatim
-
-nominatim-logs:
-	${DOCKER} compose logs -f nominatim
-
-# Quick smoke-test: geocode "New York" against the running instance
-nominatim-search:
-	@echo "Searching for 'New York'..."
-	curl -s "http://localhost:8092/search?q=New+York&format=json&limit=1" | python3 -m json.tool
-
-# Check import/service status
-nominatim-status:
-	curl -s "http://localhost:8092/status.php" | python3 -m json.tool
-
-# ------------------------------------------------------------------------------
-# FastOpenData targets
-
-fod-up:
-	@echo "Starting fastopendata container..."
-	@mkdir -p "${DATA_DIR}"
-	${DOCKER} compose up -d fastopendata
-	@echo "  shell: make fod-shell"
-
-fod-down:
-	${DOCKER} compose stop fastopendata
-
-fod-rebuild:
-	@echo "Rebuilding fastopendata image..."
-	${DOCKER} compose build fastopendata
-	${DOCKER} compose up -d fastopendata
-
-fod-shell:
-	@echo "Opening fastopendata shell..."
-	${DOCKER} compose exec fastopendata bash
-
-fod-logs:
-	${DOCKER} compose logs -f fastopendata
-
-# ------------------------------------------------------------------------------
-# FastOpenData API targets
-# The API container runs uvicorn with --reload against the bind-mounted source.
-# Swagger UI is available at http://localhost:8093/docs once the container starts.
-
+# Spark targets
 
 spark-up:
 	@echo "Starting Spark cluster..."
@@ -725,79 +606,6 @@ lsp:
 	uv run python -m pycypher.cypher_lsp
 
 # ------------------------------------------------------------------------------
-# Snakemake dataset download targets
-#
-# These targets delegate to the Snakefile in packages/fastopendata/ which
-# manages all 17 source datasets with retry logic, validation, and
-# proper dependency ordering.
-#
-# Override data directory: make fod-data DATA_DIR=/mnt/data/fastopendata
-
-
-## Download and process all 17 fastopendata datasets via Snakemake
-fod-data:
-	@echo "Downloading all fastopendata datasets ($(SNAKEMAKE_CORES) cores)..."
-	$(FOD_SNAKEMAKE)
-
-## Dry-run: show what Snakemake would download without executing
-fod-data-plan:
-	@echo "Snakemake dry-run (no downloads)..."
-	$(FOD_SNAKEMAKE) --dry-run
-
-## Download Census-sourced datasets (CJARS, crosswalk, contracts)
-fod-data-census:
-	@echo "Downloading Census survey datasets..."
-	$(FOD_SNAKEMAKE) \
-		raw_data/output/cjars_joe_2022_co.csv \
-		raw_data/state_county_tract_puma.csv \
-		raw_data/FY2025_All_Contracts_Full.csv
-
-## Download only TIGER/Line geographic shapefiles
-fod-data-tiger:
-	@echo "Downloading TIGER/Line shapefiles..."
-	$(FOD_SNAKEMAKE) \
-		raw_data/puma_combined.shp \
-		raw_data/combined_block_groups.shp
-
-## Download small multi-state sample dataset for ETL dev/testing (see config.toml geography.sample_state_fips)
-fod-data-sample:
-	@echo "Downloading fastopendata sample dataset..."
-	$(FOD_SNAKEMAKE) sample_data
-
-## Populate a small GA+DE-scoped SAMPLE_DATA_DIR that's a drop-in replacement
-## for DATA_DIR when running `nmetl run fod_input_configs.yaml`. Filters/copies
-## from an already-fully-populated DATA_DIR -- no re-downloads. Requires both
-## DATA_DIR and SAMPLE_DATA_DIR to be set. After populating, run:
-##   DATA_DIR=$$SAMPLE_DATA_DIR make fod_config
-##   DATA_DIR=$$SAMPLE_DATA_DIR uv run nmetl run packages/fastopendata/fod_input_configs.yaml
-fod-data-sample-full:
-	@echo "Populating sample DATA_DIR for nmetl iteration..."
-	$(FOD_SNAKEMAKE) sample_data_full
-
-## Download and process OpenStreetMap U.S. extract (~10 GB)
-fod-data-osm:
-	@echo "Downloading OpenStreetMap U.S. extract..."
-	$(FOD_SNAKEMAKE) raw_data/united_states_nodes.csv
-
-fod-data-acs:
-	@echo "American Community Survey"
-	$(FOD_SNAKEMAKE) raw_data/sas_hus.zip
-	$(FOD_SNAKEMAKE) raw_data/sas_pus.zip
-
-## Download and filter Wikidata geopoint entities (~100 GB raw)
-fod-data-wikidata:
-	@echo "Downloading and filtering Wikidata dump..."
-	$(FOD_SNAKEMAKE) raw_data/wikidata_us_points.json
-
-## Show Snakemake DAG status for fastopendata pipeline
-fod-data-status:
-	@echo "Snakemake pipeline status:"
-	$(FOD_SNAKEMAKE) --summary
-
-## Clean downloaded raw data (requires confirmation)
-fod-data-clean:
-
-# ------------------------------------------------------------------------------
 # Package-specific targets
 
 # Build and install only pycypher
@@ -806,5 +614,9 @@ pycypher:
 	cd ${PYCYPHER_DIR} && uv build
 	uv pip install --upgrade -e ${PYCYPHER_DIR}
 
-# Build and install only fastopendata (depends on pycypher)
+# Build and install only nmetl (depends on pycypher)
+nmetl: pycypher
+	@echo "Building and installing nmetl package..."
+	cd ${NMETL_DIR} && uv build
+	uv pip install --upgrade -e ${NMETL_DIR}
 

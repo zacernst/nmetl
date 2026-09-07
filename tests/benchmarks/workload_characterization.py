@@ -144,9 +144,7 @@ def _load_benchmark_file(path: Path) -> list[dict]:
 
 def _find_latest_benchmark(benchmark_dir: Path) -> Path | None:
     """Find the most recent benchmark JSON in the directory tree."""
-    json_files = sorted(
-        benchmark_dir.rglob("*.json"), key=lambda p: p.stat().st_mtime
-    )
+    json_files = sorted(benchmark_dir.rglob("*.json"), key=lambda p: p.stat().st_mtime)
     if not json_files:
         return None
     return json_files[-1]
@@ -203,8 +201,7 @@ def characterize_workload(benchmark_path: Path) -> WorkloadReport:
     scaling: list[ScalingSummary] = []
     for cat, scales in sorted(scale_map.items()):
         scale_means = {
-            scale: sum(vals) / len(vals)
-            for scale, vals in sorted(scales.items())
+            scale: sum(vals) / len(vals) for scale, vals in sorted(scales.items())
         }
         if len(scale_means) > 1:
             scaling.append(ScalingSummary(category=cat, scales=scale_means))

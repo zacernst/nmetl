@@ -34,9 +34,7 @@ def _ctx(backend: str) -> Context:
         },
     )
     return Context(
-        entity_mapping=EntityMapping(
-            mapping={"Person": EntityTable.from_dataframe("Person", people)}
-        ),
+        entity_mapping=EntityMapping(mapping={"Person": EntityTable.from_dataframe("Person", people)}),
         relationship_mapping=RelationshipMapping(mapping={}),
         backend=backend,
     )
@@ -80,33 +78,25 @@ class TestEligibility:
         ],
     )
     def test_eligible(self, query: str) -> None:
-        assert is_relation_eligible(
-            ASTConverter.from_cypher(query), _ctx("duckdb")
-        )
+        assert is_relation_eligible(ASTConverter.from_cypher(query), _ctx("duckdb"))
 
     def test_skip_without_limit_ineligible(self) -> None:
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN n.name AS name ORDER BY name SKIP 2"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN n.name AS name ORDER BY name SKIP 2"),
             _ctx("duckdb"),
         )
 
     def test_order_by_non_output_ineligible(self) -> None:
         # Ordering by a property that isn't returned → not an output column → fall back.
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN n.name AS name ORDER BY n.age"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN n.name AS name ORDER BY n.age"),
             _ctx("duckdb"),
         )
 
 
 class TestParity:
     def test_distinct(self) -> None:
-        _assert_parity(
-            "MATCH (n:Person) RETURN DISTINCT n.dept AS dept", ordered=False
-        )
+        _assert_parity("MATCH (n:Person) RETURN DISTINCT n.dept AS dept", ordered=False)
 
     def test_order_asc_with_null(self) -> None:
         _assert_parity(

@@ -17,6 +17,7 @@ from pycypher.relational_models import (
 )
 from pycypher.star import Star
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -25,37 +26,27 @@ from pycypher.star import Star
 @pytest.fixture
 def matcher_star() -> Star:
     """Star for pattern matching tests."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3, 4, 5],
-            "name": ["Alice", "Bob", "Carol", "Dave", "Eve"],
-            "age": [30, 25, 35, 28, 32],
-            "dept": ["eng", "mktg", "eng", "sales", "eng"],
-        }
-    )
-    companies_df = pd.DataFrame(
-        {
-            "__ID__": [10, 11],
-            "name": ["Acme", "TechCorp"],
-        }
-    )
-    works_at_df = pd.DataFrame(
-        {
-            "__ID__": [101, 102, 103],
-            "__SOURCE__": [1, 2, 3],
-            "__TARGET__": [10, 11, 10],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3, 4, 5],
+        "name": ["Alice", "Bob", "Carol", "Dave", "Eve"],
+        "age": [30, 25, 35, 28, 32],
+        "dept": ["eng", "mktg", "eng", "sales", "eng"],
+    })
+    companies_df = pd.DataFrame({
+        "__ID__": [10, 11],
+        "name": ["Acme", "TechCorp"],
+    })
+    works_at_df = pd.DataFrame({
+        "__ID__": [101, 102, 103],
+        "__SOURCE__": [1, 2, 3],
+        "__TARGET__": [10, 11, 10],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
         identifier="Person",
         column_names=["__ID__", "name", "age", "dept"],
-        source_obj_attribute_map={
-            "name": "name",
-            "age": "age",
-            "dept": "dept",
-        },
+        source_obj_attribute_map={"name": "name", "age": "age", "dept": "dept"},
         attribute_map={"name": "name", "age": "age", "dept": "dept"},
         source_obj=people_df,
     )
@@ -82,9 +73,7 @@ def matcher_star() -> Star:
         entity_mapping=EntityMapping(
             mapping={"Person": person_table, "Company": company_table}
         ),
-        relationship_mapping=RelationshipMapping(
-            mapping={"WORKS_AT": works_at_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"WORKS_AT": works_at_table}),
     )
     return Star(context=context)
 
@@ -99,9 +88,7 @@ class TestPatternMatcherSinglePattern:
 
     def test_match_single_node_label(self, matcher_star: Star) -> None:
         """(n:Person)."""
-        result = matcher_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = matcher_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 5
 
     def test_match_single_node_property(self, matcher_star: Star) -> None:
@@ -229,9 +216,7 @@ class TestPatternMatcherEdgeCases:
         with pytest.raises(GraphTypeNotFoundError):
             matcher_star.execute_query("MATCH (n:Unknown) RETURN n")
 
-    def test_match_nonexistent_relationship_type(
-        self, matcher_star: Star
-    ) -> None:
+    def test_match_nonexistent_relationship_type(self, matcher_star: Star) -> None:
         """Relationship type that doesn't exist raises GraphTypeNotFoundError."""
         from pycypher.exceptions import GraphTypeNotFoundError
 
@@ -249,9 +234,7 @@ class TestPatternMatcherEdgeCases:
 class TestPatternMatcherVariableBinding:
     """Variable binding in patterns."""
 
-    def test_bind_matched_entities_to_variables(
-        self, matcher_star: Star
-    ) -> None:
+    def test_bind_matched_entities_to_variables(self, matcher_star: Star) -> None:
         """Variables capture matched entities."""
         result = matcher_star.execute_query(
             "MATCH (p:Person) RETURN p.name ORDER BY p.name"
@@ -295,18 +278,14 @@ class TestPatternMatcherRelationshipPatterns:
         )
         assert result.iloc[0]["cnt"] == 3
 
-    def test_match_relationship_source_target(
-        self, matcher_star: Star
-    ) -> None:
+    def test_match_relationship_source_target(self, matcher_star: Star) -> None:
         """Match by source and target types."""
         result = matcher_star.execute_query(
             "MATCH (p:Person)-[:WORKS_AT]->(c:Company) RETURN COUNT(*) as cnt"
         )
         assert result.iloc[0]["cnt"] == 3
 
-    def test_match_with_direction_constraints(
-        self, matcher_star: Star
-    ) -> None:
+    def test_match_with_direction_constraints(self, matcher_star: Star) -> None:
         """Direction matters in matching."""
         result = matcher_star.execute_query(
             "MATCH (c:Company)-[:WORKS_AT]->(p:Person) RETURN COUNT(*) as cnt"

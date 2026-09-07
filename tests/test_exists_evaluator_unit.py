@@ -122,9 +122,7 @@ class TestEvaluateExistsEdgeCases:
         evaluator_mock: MagicMock,
     ) -> None:
         """Content that is neither Pattern nor Query → all False."""
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists("not a pattern", evaluator_mock)
         assert list(result) == [False, False, False]
 
@@ -134,9 +132,7 @@ class TestEvaluateExistsEdgeCases:
         evaluator_mock: MagicMock,
     ) -> None:
         """None content → all False."""
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(None, evaluator_mock)
         assert list(result) == [False, False, False]
 
@@ -146,9 +142,7 @@ class TestEvaluateExistsEdgeCases:
         evaluator_mock: MagicMock,
     ) -> None:
         """Arbitrary non-AST content → all False."""
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(42, evaluator_mock)
         assert list(result) == [False, False, False]
 
@@ -163,9 +157,7 @@ class TestEvaluateExistsEdgeCases:
             type_registry={"p": "Person"},
             context=simple_context,
         )
-        ee = ExistsEvaluator(
-            empty_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(empty_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists("anything", evaluator_mock)
         assert len(result) == 0
 
@@ -199,9 +191,7 @@ class TestEvaluateExistsQuery:
         from pycypher.star import Star
 
         Star(context=alice_frame.context)
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(subquery, evaluator_mock)
 
         # Alice (id=1) knows Bob and Carol → True
@@ -235,9 +225,7 @@ class TestEvaluateExistsQuery:
         from pycypher.star import Star
 
         Star(context=alice_frame.context)
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(subquery, evaluator_mock)
 
         assert result.dtype == bool
@@ -268,9 +256,7 @@ class TestEvaluateExistsPattern:
         path = PatternPath(elements=[source, rel, target])
         pattern = Pattern(paths=[path])
 
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(pattern, evaluator_mock)
 
         assert result.dtype == bool
@@ -303,9 +289,7 @@ class TestEvaluateExistsPattern:
         from pycypher.star import Star
 
         Star(context=alice_frame.context)
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(pattern, evaluator_mock)
 
         # Result should be boolean series of correct length
@@ -319,9 +303,7 @@ class TestEvaluateExistsPattern:
     ) -> None:
         """Pattern with no paths → falls back to query (0 elements != 3)."""
         pattern = Pattern(paths=[])
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_exists(pattern, evaluator_mock)
         # Empty pattern with no paths: content.paths is empty list,
         # so the multi-hop check fails and it falls to query execution
@@ -348,9 +330,7 @@ class TestPatternComprehensionErrors:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
         assert all(lst == [] for lst in result)
 
@@ -366,9 +346,7 @@ class TestPatternComprehensionErrors:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
         assert all(lst == [] for lst in result)
 
@@ -399,9 +377,7 @@ class TestPatternComprehensionErrors:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         with pytest.raises(PatternComprehensionError, match="single-hop"):
             ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
@@ -430,9 +406,7 @@ class TestPatternComprehensionErrors:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         with pytest.raises(PatternComprehensionError, match="NodePattern"):
             ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
@@ -453,9 +427,7 @@ class TestPatternComprehensionErrors:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         with pytest.raises(
             PatternComprehensionError, match="RelationshipPattern"
         ):
@@ -490,9 +462,7 @@ class TestPatternComprehensionFunctional:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
         # Alice (1) knows Bob (2) and Carol (3)
@@ -521,9 +491,7 @@ class TestPatternComprehensionFunctional:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
         # Alice (1) has no incoming KNOWS
@@ -553,9 +521,7 @@ class TestPatternComprehensionFunctional:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            alice_frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(alice_frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
         assert all(lst == [] for lst in result)
@@ -586,9 +552,7 @@ class TestPatternComprehensionFunctional:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
 
         # f=2 (Bob) is target of Alice(1)->Bob(2), so anchor flips: source=1
@@ -621,9 +585,7 @@ class TestPatternComprehensionFunctional:
             where=None,
             map_expr=None,
         )
-        ee = ExistsEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee.evaluate_pattern_comprehension(pc, evaluator_mock)
         assert all(lst == [] for lst in result)
 
@@ -676,8 +638,6 @@ class TestExistsViaQueryExecution:
         from pycypher.star import Star
 
         Star(context=simple_context)
-        ee = ExistsEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        ee = ExistsEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
         result = ee._exists_via_query_execution(subquery)
         assert list(result) == [False, False, False]

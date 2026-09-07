@@ -277,9 +277,7 @@ class TestInvalidComprehensions:
 class TestInvalidQuantifiers:
     """Test handling of invalid quantifier expressions."""
 
-    @pytest.mark.xfail(
-        reason="ALL is intentionally parseable as a function call"
-    )
+    @pytest.mark.xfail(reason="ALL is intentionally parseable as a function call")
     def test_quantifier_without_predicate(self, parser):
         """Test error for quantifier without WHERE."""
         with pytest.raises(_PARSE_ERRORS):
@@ -481,7 +479,7 @@ class TestASTConversionErrors:
             result = converter.convert(invalid_ast)
             # May return partially converted result or handle gracefully
             assert result is not None or True
-        except KeyError, ValueError, TypeError, AttributeError:
+        except (KeyError, ValueError, TypeError, AttributeError):
             # Expected error types
             pass
 
@@ -497,7 +495,7 @@ class TestASTConversionErrors:
             result = converter.convert(invalid_ast)
             # May convert or raise error
             assert result is not None or True
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             # Expected error types
             pass
 
@@ -511,7 +509,7 @@ class TestASTConversionErrors:
             # May hit recursion limit or handle gracefully
             result = converter.convert(circular)
             assert result is not None or True
-        except RecursionError, ValueError:
+        except (RecursionError, ValueError):
             # Expected error types
             pass
 
@@ -546,9 +544,7 @@ class TestComplexErrorScenarios:
         with pytest.raises(_PARSE_ERRORS):
             parser.parse("RETURN {person: {name: 'Alice', address: {city:")
 
-    @pytest.mark.xfail(
-        reason="Backticked identifiers intentionally allow newlines in regex"
-    )
+    @pytest.mark.xfail(reason="Backticked identifiers intentionally allow newlines in regex")
     def test_invalid_escape_in_property_name(self, parser):
         """Test invalid escape in property name."""
         with pytest.raises(_PARSE_ERRORS):

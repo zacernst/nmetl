@@ -57,8 +57,7 @@ TRANSFORMER_MAP = {
 def _mixin_methods(mixin_cls) -> list[str]:
     """Return public method names defined on a mixin class."""
     return [
-        name
-        for name in dir(mixin_cls)
+        name for name in dir(mixin_cls)
         if not name.startswith("_") and callable(getattr(mixin_cls, name))
     ]
 
@@ -88,9 +87,7 @@ class TestDelegationCompleteness:
                 getattr(ct, method_name)
             except AttributeError:
                 missing.append(method_name)
-        assert missing == [], (
-            f"Methods not resolvable via CompositeTransformer: {missing}"
-        )
+        assert missing == [], f"Methods not resolvable via CompositeTransformer: {missing}"
 
     def test_literal_methods_delegate_to_literal_transformer(self):
         ct = CompositeTransformer()
@@ -471,8 +468,6 @@ class TestMixinInheritance:
         for mixin in ALL_MIXINS:
             for name in _mixin_methods(mixin):
                 if name in all_methods:
-                    collisions.append(
-                        f"{name}: {all_methods[name]} vs {mixin.__name__}"
-                    )
+                    collisions.append(f"{name}: {all_methods[name]} vs {mixin.__name__}")
                 all_methods[name] = mixin.__name__
         assert collisions == [], f"Method name collisions: {collisions}"

@@ -30,9 +30,7 @@ _PYCYPHER_SRC = (
 _REASSIGNMENT_PATTERN = re.compile(r"context\._\w+\s*=(?!=)")
 
 
-def test_no_whole_attribute_context_reassignment_outside_relational_models() -> (
-    None
-):
+def test_no_whole_attribute_context_reassignment_outside_relational_models() -> None:
     offenders: list[str] = []
     for path in _PYCYPHER_SRC.rglob("*.py"):
         if path.name == "relational_models.py":

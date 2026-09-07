@@ -21,9 +21,7 @@ from _perf_helpers import perf_threshold
 from pycypher.scalar_functions import ScalarFunctionRegistry
 
 ARRAY_SIZE = 100_000
-THRESHOLD_MS = perf_threshold(
-    100
-)  # numpy path is ~12 ms; apply() path is ~300-500 ms
+THRESHOLD_MS = perf_threshold(100)  # numpy path is ~12 ms; apply() path is ~300-500 ms
 # Threshold is generous to avoid flaky failures under CPU contention
 # (CI, parallel test runs, multi-agent sessions).
 

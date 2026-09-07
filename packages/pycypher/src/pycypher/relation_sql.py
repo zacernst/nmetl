@@ -2,7 +2,8 @@
 
 Compiles a conservative subset of Cypher expressions (property lookups on a
 single node variable, ``id()``/``elementId()``, literals, arithmetic,
-comparisons, boolean logic, and NULL checks) into a DuckDB SQL expression
+comparisons, boolean logic, NULL checks, ``CASE``, and the ``toFloat``/
+``toInteger`` type conversions) into a DuckDB SQL expression
 string.  Returns ``None`` for anything outside the subset so callers treat
 the query as ineligible and fall back to the pandas engine.
 
@@ -45,6 +46,22 @@ _AGG_FUNCS: dict[str, str] = {
     "avg": "AVG",
     "min": "MIN",
     "max": "MAX",
+}
+
+#: Cypher type-conversion function → DuckDB target type. Compiled as
+#: ``TRY_CAST(x AS T)`` so an unparseable input yields NULL rather than
+#: raising, matching the pandas engine's ``pd.to_numeric(errors="coerce")``
+#: (``scalar_functions/conversion_functions.py``). ``toInteger`` first goes
+#: through ``TRUNC`` of a DOUBLE because Cypher truncates toward zero
+#: (``toInteger(3.7)`` is 3) where DuckDB's cast rounds (4); the DOUBLE
+#: round-trip is the same one the pandas engine's ``np.fix`` takes, so the
+#: two agree bit-for-bit, including above 2**53. A registered UDF of the
+#: same name takes precedence (see :func:`compile_expression`).
+_CAST_FUNCS: dict[str, str] = {
+    "tofloat": "DOUBLE",
+    "tofloatornull": "DOUBLE",
+    "tointeger": "BIGINT",
+    "tointegerornull": "BIGINT",
 }
 
 #: Reserved "property" key under which a pattern variable's physical ID
@@ -192,6 +209,29 @@ def compile_expression(
             if len(raw_args) != 1 or not isinstance(raw_args[0], Variable):
                 return None
             return resolve(raw_args[0].name, ID_SENTINEL)
+
+        # --- Built-in type conversion (toFloat/toInteger) ---
+        if (
+            isinstance(node, FunctionInvocation)
+            and node.name.lower() in _CAST_FUNCS
+            and node.name.lower() not in udf_names
+        ):
+            raw_args = (
+                node.arguments.get("arguments", [])
+                if isinstance(node.arguments, dict)
+                else []
+            )
+            if len(raw_args) != 1:
+                return None
+            inner = rec(raw_args[0])
+            if inner is None:
+                return None
+            target = _CAST_FUNCS[node.name.lower()]
+            if target == "BIGINT":
+                return (
+                    f"TRY_CAST(TRUNC(TRY_CAST({inner} AS DOUBLE)) AS BIGINT)"
+                )
+            return f"TRY_CAST({inner} AS {target})"
 
         # --- Registered scalar UDF call ---
         if isinstance(node, FunctionInvocation):

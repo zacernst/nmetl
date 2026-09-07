@@ -91,12 +91,17 @@ class TestEligibility:
             _ctx("duckdb"),
         )
 
-    def test_second_required_match_ineligible(self) -> None:
-        assert not is_relation_eligible(
+    def test_second_required_match_is_a_cross_join(self) -> None:
+        # Plan translator: any further MATCH joins on shared variables (cross join when none).
+        assert is_relation_eligible(
             ASTConverter.from_cypher(
                 "MATCH (a:Person) MATCH (b:Person) RETURN a.name AS an, b.name AS bn",
             ),
             _ctx("duckdb"),
+        )
+        _assert_parity(
+            "MATCH (a:Person) MATCH (b:Person) RETURN a.name AS an, b.name AS bn",
+            ["an", "bn"],
         )
 
     def test_optional_from_unbound_node_ineligible(self) -> None:
@@ -108,12 +113,17 @@ class TestEligibility:
             _ctx("duckdb"),
         )
 
-    def test_optional_with_aggregation_ineligible(self) -> None:
-        assert not is_relation_eligible(
+    def test_optional_with_aggregation_counts_matched_only(self) -> None:
+        # Plan translator: count(<node>) counts the id column, so unmatched OPTIONAL rows count as 0.
+        assert is_relation_eligible(
             ASTConverter.from_cypher(
                 "MATCH (a:Person) OPTIONAL MATCH (a)-[:KNOWS]->(b:Person) RETURN a.name AS an, count(b) AS c",
             ),
             _ctx("duckdb"),
+        )
+        _assert_parity(
+            "MATCH (a:Person) OPTIONAL MATCH (a)-[:KNOWS]->(b:Person) RETURN a.name AS an, count(b) AS c",
+            ["an", "c"],
         )
 
 

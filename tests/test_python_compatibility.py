@@ -19,7 +19,7 @@ _WORKSPACE_TOML = Path("pyproject.toml")
 _PACKAGE_PATHS = [
     Path("packages/pycypher/pyproject.toml"),
     Path("packages/shared/pyproject.toml"),
-    Path("packages/fastopendata/pyproject.toml"),
+    Path("packages/nmetl/pyproject.toml"),
 ]
 
 

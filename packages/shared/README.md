@@ -4,7 +4,7 @@ Shared utilities, logging, metrics, and observability for the PyCypher ecosystem
 
 ## What is this?
 
-The `shared` package provides cross-cutting infrastructure used by `pycypher` and `fastopendata`. It has minimal dependencies (only `rich`) and covers logging, metrics collection, telemetry, and common helpers.
+The `shared` package provides cross-cutting infrastructure used by `pycypher` and `nmetl`. It has minimal dependencies (only `rich`) and covers logging, metrics collection, telemetry, and common helpers.
 
 ## Installation
 

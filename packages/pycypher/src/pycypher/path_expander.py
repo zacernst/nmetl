@@ -209,7 +209,7 @@ class PathExpander:
                 "   FROM _pyc_seed"
                 " UNION "
                 "  SELECT w.start_id, "
-                f"         e.{_quote(next_col)}, w.hop + 1"
+                f'         e.{_quote(next_col)}, w.hop + 1'
                 "   FROM walk w"
                 f'   JOIN "{entry.table_name}" e'
                 f"     ON e.{_quote(match_col)} = w.tip"

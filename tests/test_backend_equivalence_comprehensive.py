@@ -451,6 +451,4 @@ class TestTypeCoercionEquivalence:
         )
         _assert_results_equivalent(results)
         for _, result in results.items():
-            assert result["name"].dtype == object or str(
-                result["name"].dtype
-            ).startswith("str")
+            assert result["name"].dtype == object or str(result["name"].dtype).startswith("str")

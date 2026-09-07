@@ -162,15 +162,18 @@ class TestParity:
 
 
 class TestFallback:
-    def test_ineligible_query_still_correct_when_enabled(self) -> None:
-        # collect() is an unsupported aggregate → ineligible → must fall back to
-        # the pandas engine and still return the right answer.
+    def test_unsupported_query_is_an_error_when_enabled(self) -> None:
+        # collect() has no translation rule. With the engine enabled there
+        # is no fallback (generalisation plan, Phase 5): the error names the
+        # construct instead of silently switching engines.
+        from pycypher.plan import Unsupported
+
         ctx = _ctx(backend="duckdb")
         ctx._relation_engine_enabled = True
-        got = Star(context=ctx).execute_query(
-            "MATCH (n:Person) RETURN collect(n.name) AS names",
-        )
-        assert sorted(got["names"].iloc[0]) == ["Alice", "Bob", "Carol"]
+        with pytest.raises(Unsupported, match="collect"):
+            Star(context=ctx).execute_query(
+                "MATCH (n:Person) RETURN collect(n.name) AS names",
+            )
 
     def test_disabled_uses_existing_engine(self) -> None:
         # Eligible shape, but engine disabled → existing engine, correct result.

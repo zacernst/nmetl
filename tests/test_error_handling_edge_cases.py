@@ -118,9 +118,7 @@ class TestUnregisteredTypeErrors:
     def test_create_new_label(self, star: Star) -> None:
         """CREATE with new label should create a new entity type."""
         star.execute_query("CREATE (:Robot {serial: 'RX-78'})")
-        result = star.execute_query(
-            "MATCH (r:Robot) RETURN r.serial AS serial"
-        )
+        result = star.execute_query("MATCH (r:Robot) RETURN r.serial AS serial")
         assert result["serial"].iloc[0] == "RX-78"
 
 
@@ -138,9 +136,7 @@ class TestExceptionConstructionEdgeCases:
         assert err.example is not None
 
     def test_temporal_arithmetic_error_custom_example(self) -> None:
-        err = TemporalArithmeticError(
-            "+", "date", "int", example="custom example"
-        )
+        err = TemporalArithmeticError("+", "date", "int", example="custom example")
         assert err.example == "custom example"
         assert "custom example" in str(err)
 
@@ -161,9 +157,7 @@ class TestExceptionConstructionEdgeCases:
 
     def test_worker_execution_error(self) -> None:
         err = WorkerExecutionError(
-            worker_id="w3",
-            query_snippet="MATCH (n) RETURN n",
-            elapsed_ms=150.5,
+            worker_id="w3", query_snippet="MATCH (n) RETURN n", elapsed_ms=150.5
         )
         msg = str(err)
         assert "w3" in msg
@@ -198,17 +192,13 @@ class TestExceptionConstructionEdgeCases:
         assert isinstance(err, ValueError)
 
     def test_unsupported_function_error(self) -> None:
-        err = UnsupportedFunctionError(
-            "myFunc", supported_functions=["count", "sum"]
-        )
+        err = UnsupportedFunctionError("myFunc", supported_functions=["count", "sum"])
         assert "myFunc" in str(err)
         assert isinstance(err, ValueError)
         assert err.function_name == "myFunc"
 
     def test_unsupported_operator_error(self) -> None:
-        err = UnsupportedOperatorError(
-            "^^^", supported_operators=["+", "-", "*"]
-        )
+        err = UnsupportedOperatorError("^^^", supported_operators=["+", "-", "*"])
         assert "^^^" in str(err)
         assert isinstance(err, ValueError)
         assert err.operator == "^^^"
@@ -226,9 +216,7 @@ class TestExceptionConstructionEdgeCases:
         assert isinstance(err, ValueError)
 
     def test_query_complexity_error(self) -> None:
-        err = QueryComplexityError(
-            score=150, limit=100, breakdown={"joins": 80, "filters": 70}
-        )
+        err = QueryComplexityError(score=150, limit=100, breakdown={"joins": 80, "filters": 70})
         msg = str(err)
         assert isinstance(err, ValueError)
         assert err.score == 150
@@ -332,7 +320,9 @@ class TestSpecialValueHandling:
 
     def test_return_nonexistent_property(self, star: Star) -> None:
         """Returning a property that doesn't exist should return NULL."""
-        result = star.execute_query("MATCH (p:Person) RETURN p.email AS email")
+        result = star.execute_query(
+            "MATCH (p:Person) RETURN p.email AS email"
+        )
         assert len(result) == 3
         assert all(v is None for v in result["email"].tolist())
 

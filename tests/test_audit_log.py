@@ -332,14 +332,7 @@ def test_audit_mutation_all_operations(audit_capture):
         )
     assert len(audit_capture) == 6
     operations = {json.loads(r)["operation"] for r in audit_capture}
-    assert operations == {
-        "CREATE",
-        "SET",
-        "DELETE",
-        "DETACH_DELETE",
-        "MERGE",
-        "REMOVE",
-    }
+    assert operations == {"CREATE", "SET", "DELETE", "DETACH_DELETE", "MERGE", "REMOVE"}
 
 
 def test_audit_mutation_not_emitted_when_disabled():
@@ -398,11 +391,7 @@ def test_audit_mutation_integration_with_create(audit_capture):
     assert "mutation" in events
 
     # Find the mutation record
-    mutation_records = [
-        json.loads(r)
-        for r in audit_capture
-        if json.loads(r)["event"] == "mutation"
-    ]
+    mutation_records = [json.loads(r) for r in audit_capture if json.loads(r)["event"] == "mutation"]
     assert len(mutation_records) >= 1
     mut = mutation_records[0]
     assert mut["operation"] == "CREATE"

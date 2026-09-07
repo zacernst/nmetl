@@ -121,9 +121,10 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_no_streaming_source(self) -> None:
+    def test_eligible_in_memory_source_is_materialised(self) -> None:
+        # Plan catalog: an in-memory-only label is materialised into a registry table on first use, so it is writable.
         ctx = _entity_ctx()
-        assert not is_relation_delete_eligible(
+        assert is_relation_delete_eligible(
             _ast("MATCH (p:Person) DELETE p"),
             ctx,
         )

@@ -54,9 +54,7 @@ class TestRapidErrorRecovery:
             with pytest.raises(Exception):
                 large_star.execute_query("MATCH (broken syntax")
 
-    def test_many_syntax_errors_dont_leak_state(
-        self, large_star: Star
-    ) -> None:
+    def test_many_syntax_errors_dont_leak_state(self, large_star: Star) -> None:
         """Many consecutive syntax errors should not leak memory or state."""
         bad_queries = [
             "MATCH (",
@@ -114,7 +112,7 @@ class TestConcurrentErrorHandling:
         def run_invalid() -> None:
             try:
                 large_star.execute_query("MATCH (broken")
-            except CypherSyntaxError, Exception:
+            except (CypherSyntaxError, Exception):
                 pass  # Expected
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
@@ -228,7 +226,9 @@ class TestLargeErrorPayloads:
         """Query referencing many nonexistent labels should fail gracefully."""
         for i in range(20):
             with pytest.raises(Exception):
-                large_star.execute_query(f"MATCH (n:NonExistent{i}) RETURN n")
+                large_star.execute_query(
+                    f"MATCH (n:NonExistent{i}) RETURN n"
+                )
 
     def test_deeply_nested_property_access(self, large_star: Star) -> None:
         """Deep property chains should not stack overflow."""

@@ -38,18 +38,13 @@ class TestLifecycle:
         assert backend._owned is False
 
     def test_close_does_not_stop_shared_session(
-        self,
-        backend,
-        spark_session,
+        self, backend, spark_session,
     ) -> None:
         backend.close()
         # Shared session must still be usable after an unowned close().
-        assert (
-            spark_session.createDataFrame(
-                pd.DataFrame({ID_COLUMN: [1]}),
-            ).count()
-            == 1
-        )
+        assert spark_session.createDataFrame(
+            pd.DataFrame({ID_COLUMN: [1]}),
+        ).count() == 1
 
     def test_close_is_idempotent(self, backend) -> None:
         backend.close()
@@ -115,16 +110,12 @@ class TestFilter:
 
     def test_filter_all_true(self, backend) -> None:
         df = pd.DataFrame({ID_COLUMN: [1, 2]})
-        out = backend.to_pandas(
-            backend.filter(df, pd.Series([True, True]).values)
-        )
+        out = backend.to_pandas(backend.filter(df, pd.Series([True, True]).values))
         assert len(out) == 2
 
     def test_filter_all_false_empty(self, backend) -> None:
         df = pd.DataFrame({ID_COLUMN: [1, 2]})
-        out = backend.to_pandas(
-            backend.filter(df, pd.Series([False, False]).values)
-        )
+        out = backend.to_pandas(backend.filter(df, pd.Series([False, False]).values))
         assert len(out) == 0
 
     def test_filter_resets_index(self, backend) -> None:
@@ -149,9 +140,7 @@ class TestJoin:
     def test_left_join(self, backend) -> None:
         left = pd.DataFrame({ID_COLUMN: [1, 2], "name": ["a", "b"]})
         right = pd.DataFrame({ID_COLUMN: [2], "age": [25]})
-        out = backend.to_pandas(
-            backend.join(left, right, on=ID_COLUMN, how="left")
-        )
+        out = backend.to_pandas(backend.join(left, right, on=ID_COLUMN, how="left"))
         assert sorted(out[ID_COLUMN].tolist()) == [1, 2]
         row1 = out[out[ID_COLUMN] == 1]
         assert pd.isna(row1["age"].iloc[0])
@@ -210,13 +199,9 @@ class TestAggregate:
         df = pd.DataFrame(
             {"dept": ["eng", "eng", "mktg"], "salary": [100, 110, 80]},
         )
-        out = (
-            backend.to_pandas(
-                backend.aggregate(df, ["dept"], {"total": ("salary", "sum")}),
-            )
-            .sort_values("dept")
-            .reset_index(drop=True)
-        )
+        out = backend.to_pandas(
+            backend.aggregate(df, ["dept"], {"total": ("salary", "sum")}),
+        ).sort_values("dept").reset_index(drop=True)
         assert out["dept"].tolist() == ["eng", "mktg"]
         assert out["total"].tolist() == [210, 80]
 
@@ -229,21 +214,13 @@ class TestAggregate:
 
     def test_grouped_mean_min_max(self, backend) -> None:
         df = pd.DataFrame({"g": ["a", "a", "b"], "v": [10.0, 20.0, 5.0]})
-        out = (
-            backend.to_pandas(
-                backend.aggregate(
-                    df,
-                    ["g"],
-                    {
-                        "avg_v": ("v", "mean"),
-                        "min_v": ("v", "min"),
-                        "max_v": ("v", "max"),
-                    },
-                ),
-            )
-            .sort_values("g")
-            .reset_index(drop=True)
-        )
+        out = backend.to_pandas(
+            backend.aggregate(
+                df,
+                ["g"],
+                {"avg_v": ("v", "mean"), "min_v": ("v", "min"), "max_v": ("v", "max")},
+            ),
+        ).sort_values("g").reset_index(drop=True)
         assert out["avg_v"].tolist() == [15.0, 5.0]
         assert out["min_v"].tolist() == [10.0, 5.0]
         assert out["max_v"].tolist() == [20.0, 5.0]
@@ -262,9 +239,7 @@ class TestOrdering:
 
     def test_sort_descending(self, backend) -> None:
         df = pd.DataFrame({ID_COLUMN: [3, 1, 2]})
-        out = backend.to_pandas(
-            backend.sort(df, [ID_COLUMN], ascending=[False])
-        )
+        out = backend.to_pandas(backend.sort(df, [ID_COLUMN], ascending=[False]))
         assert out[ID_COLUMN].tolist() == [3, 2, 1]
 
     def test_sort_multi_col_mixed(self, backend) -> None:

@@ -61,9 +61,7 @@ EVALUATOR_FACTORIES = {
 }
 
 
-@pytest.fixture(
-    params=list(EVALUATOR_FACTORIES), ids=list(EVALUATOR_FACTORIES)
-)
+@pytest.fixture(params=list(EVALUATOR_FACTORIES), ids=list(EVALUATOR_FACTORIES))
 def evaluator(request: pytest.FixtureRequest) -> ExpressionEvaluatorProtocol:
     factory = EVALUATOR_FACTORIES[request.param]
     return factory(_make_frame(3))
@@ -74,27 +72,23 @@ class TestProtocolConformance:
     implementation must satisfy."""
 
     def test_satisfies_runtime_checkable_protocol(
-        self,
-        evaluator: ExpressionEvaluatorProtocol,
+        self, evaluator: ExpressionEvaluatorProtocol,
     ) -> None:
         assert isinstance(evaluator, ExpressionEvaluatorProtocol)
 
     def test_frame_property_returns_binding_frame(
-        self,
-        evaluator: ExpressionEvaluatorProtocol,
+        self, evaluator: ExpressionEvaluatorProtocol,
     ) -> None:
         assert isinstance(evaluator.frame, BindingFrame)
 
     def test_evaluate_literal_returns_series_of_correct_length(
-        self,
-        evaluator: ExpressionEvaluatorProtocol,
+        self, evaluator: ExpressionEvaluatorProtocol,
     ) -> None:
         result = evaluator.evaluate(IntegerLiteral(value=42))
         assert list(result) == [42, 42, 42]
 
     def test_evaluate_known_variable_returns_bound_values(
-        self,
-        evaluator: ExpressionEvaluatorProtocol,
+        self, evaluator: ExpressionEvaluatorProtocol,
     ) -> None:
         result = evaluator.evaluate(Variable(name="p"))
         assert list(result) == [1, 2, 3]

@@ -87,7 +87,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
 
             return result
 
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             # Fallback for complex cases
             nr = _init_null_result(s)
             if nr.non_null_vals is None:
@@ -99,7 +99,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
                     parsed_values.append(
                         date.fromisoformat(sv).isoformat(),
                     )
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     parsed_values.append(None)
 
             nr.result[nr.non_null_mask] = parsed_values
@@ -171,7 +171,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
 
             return result
 
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             # Fallback for complex cases
             nr = _init_null_result(s)
             if nr.non_null_vals is None:
@@ -184,7 +184,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
                     parsed_values.append(
                         datetime.fromisoformat(normalized).isoformat(),
                     )
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     parsed_values.append(None)
 
             nr.result[nr.non_null_mask] = parsed_values
@@ -311,7 +311,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
         for val in nr.non_null_vals:
             try:
                 parsed_values.append(_parse(val))
-            except ValueError, TypeError, AttributeError, KeyError:
+            except (ValueError, TypeError, AttributeError, KeyError):
                 parsed_values.append(None)
 
         nr.result[nr.non_null_vals.index] = parsed_values

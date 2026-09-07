@@ -17,6 +17,7 @@ from pycypher.relational_models import (
 )
 from pycypher.star import Star
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -25,13 +26,11 @@ from pycypher.star import Star
 @pytest.fixture
 def mutation_star() -> Star:
     """Star instance for mutation testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3],
-            "name": ["Alice", "Bob", "Carol"],
-            "age": [30, 25, 35],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3],
+        "name": ["Alice", "Bob", "Carol"],
+        "age": [30, 25, 35],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -59,9 +58,7 @@ class TestMutationEngineCreateNode:
 
     def test_create_single_node(self, mutation_star: Star) -> None:
         """CREATE (n:Person {name: 'Eve', age: 32})."""
-        result = mutation_star.execute_query(
-            "CREATE (n:Person {name: 'Eve', age: 32}) RETURN n.name"
-        )
+        result = mutation_star.execute_query("CREATE (n:Person {name: 'Eve', age: 32}) RETURN n.name")
         assert len(result) == 1
         assert result.iloc[0]["name"] == "Eve"
 
@@ -78,15 +75,11 @@ class TestMutationEngineCreateNode:
 
     def test_create_node_without_label(self, mutation_star: Star) -> None:
         """CREATE (n {prop: 'value'})."""
-        result = mutation_star.execute_query(
-            "CREATE (n {name: 'Unlabeled'}) RETURN n.name"
-        )
+        result = mutation_star.execute_query("CREATE (n {name: 'Unlabeled'}) RETURN n.name")
         assert len(result) == 1
         assert result.iloc[0]["name"] == "Unlabeled"
 
-    def test_create_node_with_multiple_properties(
-        self, mutation_star: Star
-    ) -> None:
+    def test_create_node_with_multiple_properties(self, mutation_star: Star) -> None:
         """CREATE node with many properties."""
         result = mutation_star.execute_query(
             "CREATE (n:Person {name: 'Multi', age: 40, dept: 'eng', salary: 100000}) "
@@ -106,12 +99,8 @@ class TestMutationEngineCreateNode:
 
     def test_create_then_query_created_node(self, mutation_star: Star) -> None:
         """CREATE then MATCH the created node."""
-        mutation_star.execute_query(
-            "CREATE (n:Person {name: 'NewPerson', age: 45})"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'NewPerson'}) RETURN p.age"
-        )
+        mutation_star.execute_query("CREATE (n:Person {name: 'NewPerson', age: 45})")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'NewPerson'}) RETURN p.age")
         assert len(result) == 1
         assert result.iloc[0]["age"] == 45
 
@@ -126,12 +115,8 @@ class TestMutationEngineSetProperty:
 
     def test_set_single_property(self, mutation_star: Star) -> None:
         """SET n.age = 31."""
-        mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Alice'}) SET p.age = 31"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Alice'}) RETURN p.age"
-        )
+        mutation_star.execute_query("MATCH (p:Person {name: 'Alice'}) SET p.age = 31")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'Alice'}) RETURN p.age")
         assert result.iloc[0]["age"] == 31
 
     def test_set_multiple_properties(self, mutation_star: Star) -> None:
@@ -146,45 +131,27 @@ class TestMutationEngineSetProperty:
 
     def test_set_with_expression(self, mutation_star: Star) -> None:
         """SET n.age = n.age + 1."""
-        mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Carol'}) SET p.age = p.age + 1"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Carol'}) RETURN p.age"
-        )
+        mutation_star.execute_query("MATCH (p:Person {name: 'Carol'}) SET p.age = p.age + 1")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'Carol'}) RETURN p.age")
         assert result.iloc[0]["age"] == 36
 
     def test_set_to_null(self, mutation_star: Star) -> None:
         """SET n.prop = NULL."""
-        mutation_star.execute_query(
-            "CREATE (n:Person {name: 'Temp', age: 50})"
-        )
-        mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Temp'}) SET p.age = NULL"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Temp'}) RETURN p.age"
-        )
+        mutation_star.execute_query("CREATE (n:Person {name: 'Temp', age: 50})")
+        mutation_star.execute_query("MATCH (p:Person {name: 'Temp'}) SET p.age = NULL")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'Temp'}) RETURN p.age")
         assert pd.isna(result.iloc[0]["age"])
 
     def test_set_adds_new_property(self, mutation_star: Star) -> None:
         """SET adds property that didn't exist."""
-        mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Alice'}) SET p.email = 'alice@example.com'"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Alice'}) RETURN p.email"
-        )
+        mutation_star.execute_query("MATCH (p:Person {name: 'Alice'}) SET p.email = 'alice@example.com'")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'Alice'}) RETURN p.email")
         assert result.iloc[0]["email"] == "alice@example.com"
 
     def test_set_batch_update(self, mutation_star: Star) -> None:
         """SET updates multiple nodes."""
-        mutation_star.execute_query(
-            "MATCH (p:Person) WHERE p.age > 28 SET p.age = 99"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person) WHERE p.age = 99 RETURN COUNT(*) as cnt"
-        )
+        mutation_star.execute_query("MATCH (p:Person) WHERE p.age > 28 SET p.age = 99")
+        result = mutation_star.execute_query("MATCH (p:Person) WHERE p.age = 99 RETURN COUNT(*) as cnt")
         # Should have Alice and Carol
         assert result.iloc[0]["cnt"] >= 1
 
@@ -199,22 +166,14 @@ class TestMutationEngineDelete:
 
     def test_delete_single_node(self, mutation_star: Star) -> None:
         """DELETE n."""
-        mutation_star.execute_query(
-            "CREATE (n:Person {name: 'ToDelete', age: 50})"
-        )
-        mutation_star.execute_query(
-            "MATCH (p:Person {name: 'ToDelete'}) DELETE p"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'ToDelete'}) RETURN p"
-        )
+        mutation_star.execute_query("CREATE (n:Person {name: 'ToDelete', age: 50})")
+        mutation_star.execute_query("MATCH (p:Person {name: 'ToDelete'}) DELETE p")
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'ToDelete'}) RETURN p")
         assert len(result) == 0
 
     def test_delete_multiple_nodes(self, mutation_star: Star) -> None:
         """DELETE multiple nodes in one query."""
-        mutation_star.execute_query(
-            "CREATE (a:Person {name: 'Del1'}), (b:Person {name: 'Del2'})"
-        )
+        mutation_star.execute_query("CREATE (a:Person {name: 'Del1'}), (b:Person {name: 'Del2'})")
         mutation_star.execute_query(
             "MATCH (p:Person) WHERE p.name IN ['Del1', 'Del2'] DELETE p"
         )
@@ -225,27 +184,19 @@ class TestMutationEngineDelete:
 
     def test_delete_with_condition(self, mutation_star: Star) -> None:
         """DELETE with WHERE condition."""
-        mutation_star.execute_query(
-            "MATCH (p:Person) WHERE p.age < 30 DELETE p"
-        )
-        result = mutation_star.execute_query(
-            "MATCH (p:Person) RETURN COUNT(*) as cnt"
-        )
+        mutation_star.execute_query("MATCH (p:Person) WHERE p.age < 30 DELETE p")
+        result = mutation_star.execute_query("MATCH (p:Person) RETURN COUNT(*) as cnt")
         # Bob (25) should be deleted, Alice (30) and Carol (35) remain
         assert result.iloc[0]["cnt"] < 3
 
     def test_delete_nonexistent_node(self, mutation_star: Star) -> None:
         """DELETE non-existent node (should fail silently)."""
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'NonExistent'}) DELETE p RETURN COUNT(*) as cnt"
-        )
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'NonExistent'}) DELETE p RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 0
 
     def test_delete_returns_count(self, mutation_star: Star) -> None:
         """DELETE operation returns affected count."""
-        result = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Alice'}) DELETE p"
-        )
+        result = mutation_star.execute_query("MATCH (p:Person {name: 'Alice'}) DELETE p")
         # Result indicates deletion happened
 
 
@@ -295,19 +246,11 @@ class TestMutationEngineMerge:
 
     def test_merge_idempotent(self, mutation_star: Star) -> None:
         """MERGE is idempotent (multiple executions same result)."""
-        mutation_star.execute_query(
-            "MERGE (p:Person {name: 'Idempotent'}) SET p.age = 50"
-        )
-        count1 = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Idempotent'}) RETURN COUNT(*) as cnt"
-        )
+        mutation_star.execute_query("MERGE (p:Person {name: 'Idempotent'}) SET p.age = 50")
+        count1 = mutation_star.execute_query("MATCH (p:Person {name: 'Idempotent'}) RETURN COUNT(*) as cnt")
 
-        mutation_star.execute_query(
-            "MERGE (p:Person {name: 'Idempotent'}) SET p.age = 50"
-        )
-        count2 = mutation_star.execute_query(
-            "MATCH (p:Person {name: 'Idempotent'}) RETURN COUNT(*) as cnt"
-        )
+        mutation_star.execute_query("MERGE (p:Person {name: 'Idempotent'}) SET p.age = 50")
+        count2 = mutation_star.execute_query("MATCH (p:Person {name: 'Idempotent'}) RETURN COUNT(*) as cnt")
 
         assert count1.iloc[0]["cnt"] == count2.iloc[0]["cnt"] == 1
 
@@ -322,9 +265,7 @@ class TestMutationEngineCreateRelationship:
 
     def test_create_simple_relationship(self, mutation_star: Star) -> None:
         """CREATE (a)-[r:KNOWS]->(b)."""
-        mutation_star.execute_query(
-            "CREATE (a:Person {name: 'X'}), (b:Person {name: 'Y'})"
-        )
+        mutation_star.execute_query("CREATE (a:Person {name: 'X'}), (b:Person {name: 'Y'})")
         mutation_star.execute_query(
             "MATCH (a:Person {name: 'X'}), (b:Person {name: 'Y'}) "
             "CREATE (a)-[r:KNOWS]->(b)"
@@ -350,13 +291,9 @@ class TestMutationEngineCreateRelationship:
         ),
         strict=True,
     )
-    def test_create_relationship_with_properties(
-        self, mutation_star: Star
-    ) -> None:
+    def test_create_relationship_with_properties(self, mutation_star: Star) -> None:
         """CREATE relationship with properties."""
-        mutation_star.execute_query(
-            "CREATE (a:Person {name: 'X'}), (b:Person {name: 'Y'})"
-        )
+        mutation_star.execute_query("CREATE (a:Person {name: 'X'}), (b:Person {name: 'Y'})")
         result = mutation_star.execute_query(
             "MATCH (a:Person {name: 'X'}), (b:Person {name: 'Y'}) "
             "CREATE (a)-[r:KNOWS {since: 2020}]->(b) RETURN r.since"
@@ -446,7 +383,8 @@ class TestMutationEngineEdgeCases:
         """ID collision handling in CREATE."""
         # IDs should be auto-generated and unique
         result = mutation_star.execute_query(
-            "CREATE (a:Person {name: 'A'}), (b:Person {name: 'B'}) RETURN a, b"
+            "CREATE (a:Person {name: 'A'}), (b:Person {name: 'B'}) "
+            "RETURN a, b"
         )
         assert len(result) == 1
 

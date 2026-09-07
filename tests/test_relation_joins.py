@@ -56,9 +56,7 @@ def _ctx(backend: str) -> Context:
     )
     return Context(
         entity_mapping=EntityMapping(mapping={"Person": person}),
-        relationship_mapping=RelationshipMapping(
-            mapping={"KNOWS": knows_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"KNOWS": knows_table}),
         backend=backend,
     )
 
@@ -95,17 +93,13 @@ class TestEligibility:
         ],
     )
     def test_ineligible_rel_shapes(self, query: str) -> None:
-        assert not is_relation_eligible(
-            ASTConverter.from_cypher(query), _ctx("duckdb")
-        )
+        assert not is_relation_eligible(ASTConverter.from_cypher(query), _ctx("duckdb"))
 
     def test_bare_join_returns_eligible_qualified(self) -> None:
         # Bare property lookups in a join are named var.property (like the
         # pandas engine), so they don't collide and are eligible.
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (a:Person)-[:KNOWS]->(b:Person) RETURN a.name, b.name"
-            ),
+            ASTConverter.from_cypher("MATCH (a:Person)-[:KNOWS]->(b:Person) RETURN a.name, b.name"),
             _ctx("duckdb"),
         )
 

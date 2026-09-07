@@ -401,7 +401,7 @@ class ScalarFunctionRegistry:
         # Only unexpected runtime exceptions are wrapped in RuntimeError.
         try:
             result = func_meta.callable(*args, **kwargs)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             raise
         except Exception as e:  # noqa: BLE001 — wraps unexpected errors; TypeError/ValueError re-raised above
             msg = f"Error executing function {name}: {e}"

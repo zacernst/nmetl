@@ -71,7 +71,7 @@ uv run python examples/retail_analytics/run_pipeline.py
 cd examples/retail_analytics
 
 # Run with verbose output to see execution progress
-uv run python -m pycypher.nmetl_cli run pipeline.yaml --verbose
+uv run python -m nmetl.nmetl_cli run pipeline.yaml --verbose
 
 # Available CLI options:
 # --dry-run          : Preview execution plan without running queries
@@ -177,8 +177,8 @@ output:
 
 **CLI Error: "No such file or directory"**
 - ✅ **Solution**: Must run CLI from the `examples/retail_analytics/` directory
-- ❌ Wrong: `uv run python -m pycypher.nmetl_cli run examples/retail_analytics/pipeline.yaml`
-- ✅ Correct: `cd examples/retail_analytics && uv run python -m pycypher.nmetl_cli run pipeline.yaml`
+- ❌ Wrong: `uv run python -m nmetl.nmetl_cli run examples/retail_analytics/pipeline.yaml`
+- ✅ Correct: `cd examples/retail_analytics && uv run python -m nmetl.nmetl_cli run pipeline.yaml`
 
 **CLI Error: "unhashable type: 'list'"**
 - ✅ **Solution**: Use `business_report_simple.cypher` (already configured in pipeline.yaml)

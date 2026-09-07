@@ -256,12 +256,7 @@ class TestAPISurface:
         """Critical public API exports are present."""
         import pycypher
 
-        critical_names = [
-            "Star",
-            "Context",
-            "EntityTable",
-            "RelationshipTable",
-        ]
+        critical_names = ["Star", "Context", "EntityTable", "RelationshipTable"]
         for name in critical_names:
             assert hasattr(pycypher, name), f"Missing critical export: {name}"
 

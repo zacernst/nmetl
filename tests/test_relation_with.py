@@ -107,14 +107,17 @@ class TestEligibility:
             _ctx("duckdb"),
         )
 
-    def test_second_match_not_preceded_by_with_ineligible(self) -> None:
-        # A second required MATCH directly after the first (no WITH) is a
-        # distinct, already-rejected shape (not this slice's cross join).
-        assert not is_relation_eligible(
+    def test_second_match_without_with_is_a_cross_join(self) -> None:
+        # Plan translator: any further MATCH joins on shared variables (cross join when none).
+        assert is_relation_eligible(
             ASTConverter.from_cypher(
                 "MATCH (n:Person) MATCH (m:Person) RETURN n.name AS x",
             ),
             _ctx("duckdb"),
+        )
+        _assert_parity(
+            "MATCH (n:Person) MATCH (m:Person) RETURN n.name AS x, m.name AS y",
+            ordered=False,
         )
 
 

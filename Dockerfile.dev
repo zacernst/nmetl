@@ -1,0 +1,73 @@
+# Development Dockerfile for pycypher
+# Optimized for VSCode Dev Containers and local development
+
+FROM python:3.14
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set timezone (adjust as needed)
+ENV TZ=UTC
+
+# Install system dependencies
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  build-essential \
+  git \
+  curl \
+  wget \
+  ca-certificates \
+  lsb-release \
+  sudo \
+  unzip \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install uv (modern Python package manager — prebuilt binary, faster than pip)
+# Installed to /usr/local/bin (not the default ~/.local/bin) so it's reachable
+# by the non-root $USERNAME user created below, not just root.
+ENV UV_INSTALL_DIR=/usr/local/bin
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Set up working directory
+WORKDIR /workspace
+
+# Configure git to allow safe directory operations
+# This is important for VSCode Dev Containers
+RUN git config --global --add safe.directory /workspace && \
+  git config --global init.defaultBranch main
+
+# Set up Python environment variables
+ENV PYTHONUNBUFFERED=1
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+
+# Install common interactive development tools (not in workspace deps)
+RUN uv pip install --system --no-cache \
+  ipython \
+  ipdb
+
+# Create a non-root user for development
+ARG USERNAME=developer
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+RUN groupadd --gid $USER_GID $USERNAME \
+  && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+  && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+  && chmod 0440 /etc/sudoers.d/$USERNAME
+USER $USERNAME
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Add helpful aliases and environment setup
+RUN echo 'alias ll="ls -lah"' >> /home/developer/.bashrc && \
+  echo 'alias gs="git status"' >> /home/developer/.bashrc && \
+  echo 'alias gp="git pull"' >> /home/developer/.bashrc && \
+  echo 'alias t="uv run pytest -n auto -x"' >> /home/developer/.bashrc && \
+  echo 'alias tf="uv run pytest -x"' >> /home/developer/.bashrc && \
+  echo 'export PS1="\[\e[32m\]\u@pycypher:\[\e[34m\]\w\[\e[0m\]\$ "' >> /home/developer/.bashrc
+
+RUN sudo mkdir /home/developer/.ssh && sudo chown -R developer:developer /home/developer/.ssh
+
+# Keep container running
+CMD ["tail", "-f", "/dev/null"]

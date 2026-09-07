@@ -622,7 +622,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
                 import math as _math
 
                 return _math.trunc(float(str(v)))
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return None
 
         list_indices = []
@@ -665,7 +665,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
                     if math.isnan(fval) and str(v) not in ("nan", "NaN")
                     else fval
                 )
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return None
 
         list_indices = []

@@ -92,7 +92,9 @@ class TestPolarsE2EAcceptance:
     def test_basic_scan(self, ctx: Context) -> None:
         """MATCH (p:Person) RETURN p.name works across all backends."""
         star = Star(context=ctx)
-        result = star.execute_query("MATCH (p:Person) RETURN p.name AS name")
+        result = star.execute_query(
+            "MATCH (p:Person) RETURN p.name AS name"
+        )
         assert sorted(result["name"].tolist()) == [
             "Alice",
             "Bob",
@@ -181,7 +183,9 @@ class TestThreeWayEquivalence:
     ]
 
     @pytest.mark.parametrize(("query", "sort_col"), _QUERIES)
-    def test_three_way_equivalence(self, query: str, sort_col: str) -> None:
+    def test_three_way_equivalence(
+        self, query: str, sort_col: str
+    ) -> None:
         """All three backends produce the same result."""
         results = {}
         for backend in ("pandas", "duckdb", "polars"):

@@ -177,7 +177,7 @@ def _get_signature(obj: Any) -> str | None:
     """Return the string signature of a callable, or None."""
     try:
         return str(inspect.signature(obj))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -267,7 +267,7 @@ def snapshot_api_surface(module_name: str) -> APISurface:
     for name in names:
         try:
             obj = getattr(mod, name)
-        except AttributeError, ImportError:
+        except (AttributeError, ImportError):
             continue
         kind = _classify_symbol(obj)
         sig = _get_signature(obj) if kind in ("function", "class") else None

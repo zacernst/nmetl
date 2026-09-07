@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING
 import pandas as pd
 import pytest
 from pycypher.backends.duckdb_backend import (
-    _SCRATCH_FILE_PREFIX,
     DuckDBBackend,
+    _SCRATCH_FILE_PREFIX,
     create_duckdb_connection,
     create_scratch_database_path,
     sweep_orphaned_scratch_databases,
@@ -41,10 +41,7 @@ class TestDatabasePathBackwardCompat:
         con = create_duckdb_connection()
         try:
             # An in-memory database has no on-disk database file.
-            assert con.execute("PRAGMA database_list").fetchall()[0][2] in (
-                None,
-                "",
-            )
+            assert con.execute("PRAGMA database_list").fetchall()[0][2] in (None, "")
         finally:
             con.close()
 
@@ -66,9 +63,7 @@ class TestFileBackedBackend:
         # Reopen and confirm the table survived the close.
         backend2 = DuckDBBackend(database_path=db_path)
         try:
-            got = backend2.connection.execute(
-                "SELECT * FROM t ORDER BY id"
-            ).fetchdf()
+            got = backend2.connection.execute("SELECT * FROM t ORDER BY id").fetchdf()
         finally:
             backend2.close()
         pd.testing.assert_frame_equal(
@@ -77,9 +72,7 @@ class TestFileBackedBackend:
             check_dtype=False,
         )
 
-    def test_create_duckdb_connection_file_backed(
-        self, tmp_path: Path
-    ) -> None:
+    def test_create_duckdb_connection_file_backed(self, tmp_path: Path) -> None:
         db_path = str(tmp_path / "conn.duckdb")
         con = create_duckdb_connection(database_path=db_path)
         try:
@@ -96,22 +89,16 @@ class TestCreateScratchDatabasePath:
         assert first != second
 
     def test_respects_scratch_dir_env_var(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         scratch_dir = tmp_path / "scratch"
-        monkeypatch.setenv(
-            "PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(scratch_dir)
-        )
+        monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(scratch_dir))
         path = create_scratch_database_path()
         assert path.startswith(str(scratch_dir))
         assert scratch_dir.is_dir()
 
     def test_filename_has_expected_prefix_and_suffix(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(tmp_path))
         path = create_scratch_database_path()
@@ -120,9 +107,7 @@ class TestCreateScratchDatabasePath:
         assert filename.endswith(".duckdb")
 
     def test_usable_as_a_real_database_path(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(tmp_path))
         path = create_scratch_database_path()
@@ -136,9 +121,7 @@ class TestCreateScratchDatabasePath:
 
 class TestSweepOrphanedScratchDatabases:
     def test_removes_only_old_matching_files(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(tmp_path))
 
@@ -162,21 +145,15 @@ class TestSweepOrphanedScratchDatabases:
         assert unrelated_old.exists()
 
     def test_no_matching_files_returns_empty_list(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(tmp_path))
         assert sweep_orphaned_scratch_databases(max_age_seconds=1000) == []
 
     def test_missing_scratch_directory_is_created_and_swept_empty(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         missing_dir = tmp_path / "does-not-exist-yet"
-        monkeypatch.setenv(
-            "PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(missing_dir)
-        )
+        monkeypatch.setenv("PYCYPHER_DUCKDB_SCRATCH_DIRECTORY", str(missing_dir))
         assert sweep_orphaned_scratch_databases(max_age_seconds=1000) == []
         assert missing_dir.is_dir()

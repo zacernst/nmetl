@@ -64,7 +64,7 @@ def run_cli_method():
             "run",
             "python",
             "-m",
-            "pycypher.nmetl_cli",
+            "nmetl.nmetl_cli",
             "run",
             "pipeline.yaml",
             "--verbose",

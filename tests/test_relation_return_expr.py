@@ -33,9 +33,7 @@ def _ctx(backend: str) -> Context:
         },
     )
     return Context(
-        entity_mapping=EntityMapping(
-            mapping={"Person": EntityTable.from_dataframe("Person", people)}
-        ),
+        entity_mapping=EntityMapping(mapping={"Person": EntityTable.from_dataframe("Person", people)}),
         relationship_mapping=RelationshipMapping(mapping={}),
         backend=backend,
     )
@@ -56,9 +54,7 @@ def _assert_parity(query: str, sort_col: str) -> None:
 class TestEligibility:
     def test_aliased_arithmetic_eligible(self) -> None:
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN n.age + 1 AS next_age"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN n.age + 1 AS next_age"),
             _ctx("duckdb"),
         )
 
@@ -71,9 +67,7 @@ class TestEligibility:
 
     def test_unsupported_function_ineligible(self) -> None:
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN upper(n.name) AS u"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN upper(n.name) AS u"),
             _ctx("duckdb"),
         )
 
@@ -82,19 +76,10 @@ class TestParity:
     @pytest.mark.parametrize(
         ("query", "sort_col"),
         [
-            (
-                "MATCH (n:Person) RETURN n.name AS name, n.age + 1 AS next_age",
-                "name",
-            ),
-            (
-                "MATCH (n:Person) RETURN n.name AS name, n.age * 2 AS double_age",
-                "name",
-            ),
+            ("MATCH (n:Person) RETURN n.name AS name, n.age + 1 AS next_age", "name"),
+            ("MATCH (n:Person) RETURN n.name AS name, n.age * 2 AS double_age", "name"),
             ("MATCH (n:Person) RETURN n.name AS name, n.age - 5 AS x", "name"),
-            (
-                "MATCH (n:Person) WHERE n.age > 26 RETURN n.name AS name, n.age + 100 AS y",
-                "name",
-            ),
+            ("MATCH (n:Person) WHERE n.age > 26 RETURN n.name AS name, n.age + 100 AS y", "name"),
         ],
     )
     def test_return_expr_parity(self, query: str, sort_col: str) -> None:
@@ -103,12 +88,7 @@ class TestParity:
     def test_arithmetic_values(self) -> None:
         ctx = _ctx("duckdb")
         ctx._relation_engine_enabled = True
-        got = (
-            Star(context=ctx)
-            .execute_query(
-                "MATCH (n:Person) RETURN n.name AS name, n.age + 1 AS next_age",
-            )
-            .sort_values("name")
-            .reset_index(drop=True)
-        )
+        got = Star(context=ctx).execute_query(
+            "MATCH (n:Person) RETURN n.name AS name, n.age + 1 AS next_age",
+        ).sort_values("name").reset_index(drop=True)
         assert got["next_age"].tolist() == [31, 26, 36]

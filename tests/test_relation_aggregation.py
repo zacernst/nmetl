@@ -33,9 +33,7 @@ def _ctx(backend: str) -> Context:
         },
     )
     return Context(
-        entity_mapping=EntityMapping(
-            mapping={"Person": EntityTable.from_dataframe("Person", people)}
-        ),
+        entity_mapping=EntityMapping(mapping={"Person": EntityTable.from_dataframe("Person", people)}),
         relationship_mapping=RelationshipMapping(mapping={}),
         backend=backend,
     )
@@ -53,9 +51,7 @@ def _assert_parity(query: str, sort_cols: list[str] | None) -> None:
     else:
         got = got[oracle.columns]
     pd.testing.assert_frame_equal(
-        oracle.reset_index(drop=True),
-        got.reset_index(drop=True),
-        check_dtype=False,
+        oracle.reset_index(drop=True), got.reset_index(drop=True), check_dtype=False,
     )
 
 
@@ -68,9 +64,7 @@ class TestEligibility:
 
     def test_grouped_agg_eligible(self) -> None:
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN n.dept AS d, count(*) AS c"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN n.dept AS d, count(*) AS c"),
             _ctx("duckdb"),
         )
 
@@ -83,9 +77,7 @@ class TestEligibility:
     def test_unsupported_agg_ineligible(self) -> None:
         # collect() not supported yet.
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN collect(n.name) AS names"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN collect(n.name) AS names"),
             _ctx("duckdb"),
         )
 
@@ -96,35 +88,15 @@ class TestParity:
         [
             ("MATCH (n:Person) RETURN count(*) AS c", None),
             ("MATCH (n:Person) RETURN count(n) AS c", None),
-            (
-                "MATCH (n:Person) RETURN sum(n.age) AS total, avg(n.age) AS avg_age",
-                None,
-            ),
-            (
-                "MATCH (n:Person) RETURN min(n.age) AS lo, max(n.age) AS hi",
-                None,
-            ),
+            ("MATCH (n:Person) RETURN sum(n.age) AS total, avg(n.age) AS avg_age", None),
+            ("MATCH (n:Person) RETURN min(n.age) AS lo, max(n.age) AS hi", None),
             ("MATCH (n:Person) RETURN n.dept AS d, count(*) AS c", ["d"]),
-            (
-                "MATCH (n:Person) RETURN n.dept AS d, avg(n.age) AS avg_age",
-                ["d"],
-            ),
-            (
-                "MATCH (n:Person) RETURN n.dept AS d, count(n.age) AS n_age, sum(n.age) AS total",
-                ["d"],
-            ),
-            (
-                "MATCH (n:Person) WHERE n.age > 24 RETURN n.dept AS d, count(*) AS c",
-                ["d"],
-            ),
+            ("MATCH (n:Person) RETURN n.dept AS d, avg(n.age) AS avg_age", ["d"]),
+            ("MATCH (n:Person) RETURN n.dept AS d, count(n.age) AS n_age, sum(n.age) AS total", ["d"]),
+            ("MATCH (n:Person) WHERE n.age > 24 RETURN n.dept AS d, count(*) AS c", ["d"]),
             ("MATCH (n:Person) RETURN count(DISTINCT n.dept) AS depts", None),
-            (
-                "MATCH (n:Person) RETURN n.dept, count(*) AS c",
-                ["dept"],
-            ),  # bare group key
+            ("MATCH (n:Person) RETURN n.dept, count(*) AS c", ["dept"]),  # bare group key
         ],
     )
-    def test_aggregation_parity(
-        self, query: str, sort_cols: list[str] | None
-    ) -> None:
+    def test_aggregation_parity(self, query: str, sort_cols: list[str] | None) -> None:
         _assert_parity(query, sort_cols)

@@ -509,6 +509,7 @@ class TestDemoScriptRunnable:
     def test_demo_functions_importable(self) -> None:
         """All demo functions can be imported."""
         import importlib
+        import logging
         import sys
 
         spec = importlib.util.spec_from_file_location(
@@ -517,8 +518,16 @@ class TestDemoScriptRunnable:
         )
         assert spec is not None
         mod = importlib.util.module_from_spec(spec)
+        # Executing the script must not leak process-wide state: it used
+        # to call logging.disable(CRITICAL) at import time, which silenced
+        # every later logging assertion on the same xdist worker.
+        global_disable = logging.root.manager.disable
         sys.modules["run_demo"] = mod
-        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        try:
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        finally:
+            logging.disable(global_disable)
+        assert logging.root.manager.disable == global_disable
 
         # Verify expected functions exist
         assert hasattr(mod, "load_graph")

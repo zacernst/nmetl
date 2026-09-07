@@ -214,9 +214,7 @@ _DELTALAKE_PAGE_SIZE_INCOMPATIBLE = mmap.PAGESIZE != 4096
 if _DELTALAKE_PAGE_SIZE_INCOMPATIBLE:
     deltalake = None
 else:
-    deltalake = pytest.importorskip(
-        "deltalake", reason="deltalake not installed"
-    )
+    deltalake = pytest.importorskip("deltalake", reason="deltalake not installed")
 
 
 @pytest.mark.skipif(

@@ -35,9 +35,7 @@ def _ctx() -> Context:
         },
     )
     ctx = Context(
-        entity_mapping=EntityMapping(
-            mapping={"Person": EntityTable.from_dataframe("Person", people)}
-        ),
+        entity_mapping=EntityMapping(mapping={"Person": EntityTable.from_dataframe("Person", people)}),
         relationship_mapping=RelationshipMapping(mapping={}),
         backend="duckdb",
     )
@@ -57,9 +55,7 @@ class TestUnregistered:
     def test_unregistered_function_ineligible(self) -> None:
         # No UDF registered → function call → ineligible.
         assert not is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN shout(n.name) AS s"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN shout(n.name) AS s"),
             _ctx(),
         )
 
@@ -67,38 +63,19 @@ class TestUnregistered:
 class TestRegisteredUDF:
     def test_udf_in_return(self) -> None:
         ctx = _ctx()
-        register_relation_udf(
-            ctx,
-            "shout",
-            _shout,
-            param_types=["VARCHAR"],
-            return_type="VARCHAR",
-        )
+        register_relation_udf(ctx, "shout", _shout, param_types=["VARCHAR"], return_type="VARCHAR")
         assert is_relation_eligible(
-            ASTConverter.from_cypher(
-                "MATCH (n:Person) RETURN shout(n.name) AS s"
-            ),
+            ASTConverter.from_cypher("MATCH (n:Person) RETURN shout(n.name) AS s"),
             ctx,
         )
-        got = (
-            Star(context=ctx)
-            .execute_query(
-                "MATCH (n:Person) RETURN n.name AS name, shout(n.name) AS s",
-            )
-            .sort_values("name")
-            .reset_index(drop=True)
-        )
+        got = Star(context=ctx).execute_query(
+            "MATCH (n:Person) RETURN n.name AS name, shout(n.name) AS s",
+        ).sort_values("name").reset_index(drop=True)
         assert got["s"].tolist() == ["ALICE!", "BOB!", "CAROL!"]
 
     def test_udf_in_where(self) -> None:
         ctx = _ctx()
-        register_relation_udf(
-            ctx,
-            "plus_ten",
-            _plus_ten,
-            param_types=["BIGINT"],
-            return_type="BIGINT",
-        )
+        register_relation_udf(ctx, "plus_ten", _plus_ten, param_types=["BIGINT"], return_type="BIGINT")
         got = Star(context=ctx).execute_query(
             "MATCH (n:Person) WHERE plus_ten(n.age) > 39 RETURN n.name AS name",
         )
@@ -107,19 +84,8 @@ class TestRegisteredUDF:
 
     def test_udf_numeric_return(self) -> None:
         ctx = _ctx()
-        register_relation_udf(
-            ctx,
-            "plus_ten",
-            _plus_ten,
-            param_types=["BIGINT"],
-            return_type="BIGINT",
-        )
-        got = (
-            Star(context=ctx)
-            .execute_query(
-                "MATCH (n:Person) RETURN n.name AS name, plus_ten(n.age) AS a",
-            )
-            .sort_values("name")
-            .reset_index(drop=True)
-        )
+        register_relation_udf(ctx, "plus_ten", _plus_ten, param_types=["BIGINT"], return_type="BIGINT")
+        got = Star(context=ctx).execute_query(
+            "MATCH (n:Person) RETURN n.name AS name, plus_ten(n.age) AS a",
+        ).sort_values("name").reset_index(drop=True)
         assert got["a"].tolist() == [40, 35, 45]

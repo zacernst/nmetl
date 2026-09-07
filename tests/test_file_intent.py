@@ -27,10 +27,7 @@ class TestRiskAssessment:
 
     def test_init_is_high_risk(self) -> None:
         registry = IntentRegistry()
-        assert (
-            registry.assess_risk("packages/shared/src/shared/__init__.py")
-            == RiskLevel.HIGH
-        )
+        assert registry.assess_risk("packages/shared/src/shared/__init__.py") == RiskLevel.HIGH
 
     def test_base_py_is_high_risk(self) -> None:
         registry = IntentRegistry()
@@ -51,10 +48,7 @@ class TestRiskAssessment:
     def test_existing_file_is_medium_risk(self) -> None:
         registry = IntentRegistry(repo_root=Path(__file__).parent.parent)
         # This test file itself exists, so it should be medium risk.
-        assert (
-            registry.assess_risk("tests/test_file_intent.py")
-            == RiskLevel.MEDIUM
-        )
+        assert registry.assess_risk("tests/test_file_intent.py") == RiskLevel.MEDIUM
 
     def test_nonexistent_file_is_low_risk(self) -> None:
         registry = IntentRegistry(repo_root=Path(__file__).parent.parent)
@@ -205,9 +199,7 @@ class TestSummary:
         registry.register("agent-1", "foo.py", "add feature")
         summary = registry.summary()
         assert "foo.py" in summary
-        assert summary["foo.py"] == [
-            {"agent": "agent-1", "description": "add feature"}
-        ]
+        assert summary["foo.py"] == [{"agent": "agent-1", "description": "add feature"}]
 
 
 # ---------------------------------------------------------------------------
@@ -229,10 +221,7 @@ class TestThreadSafety:
             except Exception as exc:
                 errors.append(exc)
 
-        threads = [
-            threading.Thread(target=register_many, args=(f"agent-{n}",))
-            for n in range(4)
-        ]
+        threads = [threading.Thread(target=register_many, args=(f"agent-{n}",)) for n in range(4)]
         for t in threads:
             t.start()
         for t in threads:

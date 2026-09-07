@@ -61,13 +61,17 @@ class TestEligibility:
             ASTConverter.from_cypher(query), _ctx("duckdb")
         )
 
-    def test_unwind_after_match_ineligible(self) -> None:
-        # UNWIND in pattern scope (right after MATCH) is deferred.
-        assert not is_relation_eligible(
+    def test_unwind_after_match_eligible(self) -> None:
+        # Plan translator: UNNEST keeps the pattern's bindings, so UNWIND works in any scope.
+        assert is_relation_eligible(
             ASTConverter.from_cypher(
                 "MATCH (p:Person) UNWIND [1, 2] AS x RETURN p.name AS name, x AS n",
             ),
             _ctx("duckdb"),
+        )
+        _assert_parity(
+            "MATCH (p:Person) UNWIND [1, 2] AS x RETURN p.name AS name, x AS n",
+            ["name", "n"],
         )
 
 

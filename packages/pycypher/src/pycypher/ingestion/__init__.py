@@ -1,7 +1,12 @@
 """Ingestion layer for loading external data into pycypher.
 
 Provides Arrow (via PyArrow) as the canonical in-memory tabular format and
-DuckDB as the universal ingestion adapter.
+DuckDB as the universal ingestion adapter.  Everything here is engine-level:
+it is what :class:`~pycypher.star.Star` and the relation engine need to read
+tabular data into a :class:`~pycypher.relational_models.Context` and to write
+results back out.  The YAML pipeline configuration, config validation,
+pipeline builder, and data-preview helpers live in the ``nmetl`` package,
+which depends on this one.
 
 Data Sources
 ------------
@@ -45,46 +50,36 @@ Use :class:`ContextBuilder` to assemble a query context from data sources::
     )
     star = Star(context=context)
 
-Pipeline Configuration
-----------------------
+Writing Results
+---------------
 
-Define and validate YAML-based ETL pipelines::
+:func:`write_dataframe_to_uri` writes a result DataFrame to a local path or
+``file://`` URI, inferring the format from the extension unless an explicit
+:class:`OutputFormat` is given::
 
-    from pycypher.ingestion import PipelineConfig, load_pipeline_config, validate_config
+    from pycypher.ingestion import write_dataframe_to_uri, OutputFormat
 
-    config = load_pipeline_config("pipeline.yaml")
-    result = validate_config(config)
-    if not result.is_valid:
-        for error in result.errors:
-            print(error)
+    write_dataframe_to_uri(result, "out/people.parquet")
+    write_dataframe_to_uri(result, "out/people.dat", fmt=OutputFormat.CSV)
 
-Data Preview & Introspection
------------------------------
+Submodules
+----------
 
-Inspect data sources before building full contexts::
-
-    from pycypher.ingestion import DataSourceIntrospector, DataSampler
-
-    introspector = DataSourceIntrospector(source)
-    schema = introspector.get_schema()
-
-    sampler = DataSampler(source)
-    preview = sampler.sample(n=10)
+* :mod:`~pycypher.ingestion.data_sources` -- ``DataSource`` implementations
+  and URI dispatch.
+* :mod:`~pycypher.ingestion.context_builder` -- ``ContextBuilder``.
+* :mod:`~pycypher.ingestion.streaming_entity` -- registry-backed entities for
+  the DuckDB out-of-core path.
+* :mod:`~pycypher.ingestion.duckdb_reader` -- DuckDB-backed file reader.
+* :mod:`~pycypher.ingestion.arrow_utils` -- Arrow schema helpers.
+* :mod:`~pycypher.ingestion.security` -- URI, path, and SQL identifier
+  sanitisation shared by every reader and writer.
+* :mod:`~pycypher.ingestion.output_writer` -- result writers.
 """
 
 from __future__ import annotations
 
-from pycypher.ingestion.config import PipelineConfig, load_pipeline_config
 from pycypher.ingestion.context_builder import ContextBuilder
-from pycypher.ingestion.data_preview import (
-    ColumnStats,
-    DataSampler,
-    PreviewCache,
-    QueryResult,
-    QueryTester,
-    SamplingStrategy,
-    SchemaInfo,
-)
 from pycypher.ingestion.data_sources import (
     ArrowDataSource,
     CsvFormat,
@@ -98,26 +93,14 @@ from pycypher.ingestion.data_sources import (
     data_source_from_uri,
 )
 from pycypher.ingestion.duckdb_reader import DuckDBReader
-from pycypher.ingestion.introspector import DataSourceIntrospector
-from pycypher.ingestion.output_writer import write_dataframe_to_uri
-from pycypher.ingestion.pipeline_builder import (
-    PipelineBuilder,
-    PipelineOperation,
-    PipelineSnapshot,
-)
-from pycypher.ingestion.validation import (
-    ValidationResult,
-    validate_config,
-    validate_config_dict,
+from pycypher.ingestion.output_writer import (
+    OutputFormat,
+    write_dataframe_to_uri,
 )
 
 __all__ = [
     "ArrowDataSource",
     "ContextBuilder",
-    "DataSourceIntrospector",
-    "PipelineBuilder",
-    "PipelineOperation",
-    "PipelineSnapshot",
     "CsvFormat",
     "DataFrameDataSource",
     "DataSource",
@@ -125,20 +108,43 @@ __all__ = [
     "FileDataSource",
     "Format",
     "JsonFormat",
+    "OutputFormat",
     "ParquetFormat",
     "SqlDataSource",
-    "ColumnStats",
-    "DataSampler",
-    "PreviewCache",
-    "QueryResult",
-    "QueryTester",
-    "SamplingStrategy",
-    "SchemaInfo",
     "data_source_from_uri",
     "write_dataframe_to_uri",
-    "PipelineConfig",
-    "load_pipeline_config",
-    "ValidationResult",
-    "validate_config",
-    "validate_config_dict",
 ]
+
+# Names that used to be re-exported here and now live in the nmetl package.
+# Kept only so that a stale import fails with a pointer instead of a bare
+# AttributeError; pycypher itself must never import nmetl.
+_MOVED_TO_NMETL: dict[str, str] = {
+    "PipelineConfig": "nmetl.config",
+    "load_pipeline_config": "nmetl.config",
+    "ValidationResult": "nmetl.validation",
+    "validate_config": "nmetl.validation",
+    "validate_config_dict": "nmetl.validation",
+    "PipelineBuilder": "nmetl.pipeline_builder",
+    "PipelineOperation": "nmetl.pipeline_builder",
+    "PipelineSnapshot": "nmetl.pipeline_builder",
+    "DataSourceIntrospector": "nmetl.introspector",
+    "ColumnStats": "nmetl.data_preview",
+    "DataSampler": "nmetl.data_preview",
+    "PreviewCache": "nmetl.data_preview",
+    "QueryResult": "nmetl.data_preview",
+    "QueryTester": "nmetl.data_preview",
+    "SamplingStrategy": "nmetl.data_preview",
+    "SchemaInfo": "nmetl.data_preview",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Point stale imports of pipeline-config names at their new home."""
+    if name in _MOVED_TO_NMETL:
+        msg = (
+            f"{name!r} moved out of pycypher.ingestion; "
+            f"import it from {_MOVED_TO_NMETL[name]} (package 'nmetl')."
+        )
+        raise AttributeError(msg)
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

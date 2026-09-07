@@ -373,9 +373,7 @@ class TestTDDInfrastructureValidation:
 
         # Basic performance validation
         assert execution_time > 0  # Should take some time
-        assert execution_time < perf_threshold(
-            1.0
-        )  # Should be reasonably fast
+        assert execution_time < perf_threshold(1.0)  # Should be reasonably fast
 
         print("✓ Fixed performance measurement methodology validated")
         print("✓ Testing Loop 273 TDD infrastructure fixes complete")

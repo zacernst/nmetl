@@ -29,9 +29,7 @@ def _make_evaluator(n: int = 3) -> tuple[ComparisonEvaluator, MagicMock]:
     """Build a ComparisonEvaluator with a mocked frame of length n."""
     frame = MagicMock()
     frame.__len__ = MagicMock(return_value=n)
-    return ComparisonEvaluator(
-        frame, evaluator_factory=BindingExpressionEvaluator
-    ), frame
+    return ComparisonEvaluator(frame, evaluator_factory=BindingExpressionEvaluator), frame
 
 
 def _mock_parent_evaluator(*series_list: pd.Series) -> MagicMock:

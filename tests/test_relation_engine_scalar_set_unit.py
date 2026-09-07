@@ -1,4 +1,4 @@
-"""Phase 2b-i (docs/fastopendata_streaming_qualification_plan.md) —
+"""Phase 2b-i (the FastOpenData streaming-qualification plan (private repository)) —
 single-node scalar ``WITH``-then-``SET`` mutation eligibility.
 
 Closes category (A) of the Phase 2 long tail: a single-node ``MATCH (var)
@@ -267,11 +267,10 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_no_streaming_source(self) -> None:
+    def test_eligible_in_memory_source_is_materialised(self) -> None:
+        # Plan catalog: an in-memory-only label is materialised into a registry table on first use, so it is writable.
         ctx = _entity_ctx()
-        assert not is_relation_scalar_set_eligible(
-            _ast(_SCALAR_SET_QUERY), ctx
-        )
+        assert is_relation_scalar_set_eligible(_ast(_SCALAR_SET_QUERY), ctx)
 
     def test_ineligible_pandas_backend(self) -> None:
         ctx = _entity_ctx(backend="pandas")
@@ -400,7 +399,7 @@ class TestExecution:
 
 
 class TestNewColumn:
-    """Phase 3a (docs/fastopendata_streaming_qualification_plan.md) -- a
+    """Phase 3a (the FastOpenData streaming-qualification plan (private repository)) -- a
     SET target property that doesn't exist yet in the raw file is created
     via ALTER TABLE rather than making the whole query ineligible.
     """

@@ -138,7 +138,7 @@ class TableRegistry:
     Held by :class:`~pycypher.backends.duckdb_backend.DuckDBBackend` and
     reached as ``backend.tables``.  Re-registering a label **merges** into
     the existing table rather than replacing it (Phase 3c —
-    docs/fastopendata_streaming_qualification_plan.md), so a label produced
+    the FastOpenData streaming-qualification plan (private repository)), so a label produced
     by more than one source (e.g. an entity enriched by several files
     sharing one identity, or a relationship type whose edges come from
     several files) ends up with all of their data rather than only the
@@ -179,7 +179,17 @@ class TableRegistry:
 
         When *label* (of this *kind*) is already registered, *relation* is
         **merged** into the existing table instead of replacing it (Phase
-        3c — docs/fastopendata_streaming_qualification_plan.md):
+        3c — the FastOpenData streaming-qualification plan (private repository)):
+
+        An entity registration with an *id_col* keeps only the **first row
+        per id** (file order), dropping later duplicates with a warning —
+        the same contract as the eager path's ``normalize_entity_table``
+        and ``streaming_entity._dedup_on_id``. This matters for sources
+        loaded at a finer grain than the entity (the fastopendata
+        state/county/tract/PUMA crosswalk has one row per *tract* yet
+        defines ``State``), and it must happen *before* a merge: joining
+        two undeduplicated sides fans out to the product of their
+        duplicate counts. See :meth:`_dedup_entity_table`.
 
         * :data:`ENTITY_KIND` — a ``FULL OUTER JOIN`` keyed by identity,
           coalescing the id column and unioning every other column. A row
@@ -235,6 +245,12 @@ class TableRegistry:
             # failed prior run on a file-backed (scratch) database.
             self._con.execute(f'DROP TABLE IF EXISTS "{table_name}"')  # nosec B608 — name built by physical_table_name/validate_identifier
             rel.create(table_name)
+            if (
+                kind == ENTITY_KIND
+                and id_col is not None
+                and id_col in rel.columns
+            ):
+                self._dedup_entity_table(table_name, id_col, label)
             final_id_col = id_col
             final_attr_map = attr_map
         else:
@@ -328,14 +344,71 @@ class TableRegistry:
         ]
         select_parts += [f'old."{c}" AS "{c}"' for c in old_keep]
         select_parts += [f'new."{c}" AS "{c}"' for c in new_cols]
-        sql = (
-            f"SELECT {', '.join(select_parts)} "
-            f'FROM "{table_name}" AS old '
-            f'FULL OUTER JOIN new AS new ON old."{old_id}" = new."{new_id}"'
-        )  # nosec B608 — table_name from physical_table_name/validate_identifier; old_id/new_id/old_cols/new_cols all pass validate_identifier above
-        merged_rel = new_rel.query("new", sql)
-        self._swap_in_merged_table(merged_rel, table_name)
+
+        # Materialise the new side first so it can be deduplicated by id
+        # (rowid order, same as a fresh registration) before the join; the
+        # existing side was deduplicated when it was registered. Joining
+        # the lazy scan directly would fan out on duplicate ids.
+        new_tmp = f"{table_name}__new_tmp__"
+        self._con.execute(f'DROP TABLE IF EXISTS "{new_tmp}"')  # nosec B608 — name derived from physical_table_name/validate_identifier plus a fixed literal suffix
+        new_rel.create(new_tmp)
+        try:
+            self._dedup_entity_table(new_tmp, new_id, existing.label)
+            sql = (
+                f"SELECT {', '.join(select_parts)} "
+                f'FROM "{table_name}" AS old '
+                f'FULL OUTER JOIN "{new_tmp}" AS new '
+                f'ON old."{old_id}" = new."{new_id}"'
+            )  # nosec B608 — table_name/new_tmp from physical_table_name/validate_identifier; old_id/new_id/old_cols/new_cols all pass validate_identifier above
+            self._swap_in_merged_table(self._con.sql(sql), table_name)
+        finally:
+            self._con.execute(f'DROP TABLE IF EXISTS "{new_tmp}"')  # nosec B608 — see above
         return old_id
+
+    def _dedup_entity_table(
+        self, table_name: str, id_col: str, label: str
+    ) -> None:
+        """Keep the first row per *id_col* in *table_name*; drop the rest.
+
+        Mirrors the eager path (``arrow_utils._dedup_on_id`` and
+        ``streaming_entity._dedup_on_id``): "first" is file order, taken
+        from the materialised table's ``rowid`` so it is deterministic (a
+        window over a parallel file scan would not be), and the rewrite
+        happens on disk so it can spill. Only rewrites when duplicates
+        actually exist — the check is two aggregates — and warns when it
+        does, since a duplicate entity id usually means a fact table was
+        loaded at the wrong grain.
+        """
+        quoted_id = f'"{validate_identifier(id_col)}"'
+        counts = self._con.execute(
+            f'SELECT count(*), count(DISTINCT {quoted_id}) FROM "{table_name}"',  # nosec B608 — identifiers validated/quoted
+        ).fetchone()
+        if counts is None or counts[0] == counts[1]:
+            return
+        before, after = int(counts[0]), int(counts[1])
+        staging = f"{table_name}__dedup_tmp__"
+        self._con.execute(f'DROP TABLE IF EXISTS "{staging}"')  # nosec B608 — derived name
+        self._con.execute(
+            f'CREATE TABLE "{staging}" AS '  # nosec B608 — identifiers validated/quoted
+            'SELECT * EXCLUDE ("__row_ord__") FROM ('
+            f'  SELECT *, rowid AS "__row_ord__" FROM "{table_name}"'
+            ") QUALIFY row_number() OVER ("
+            f'  PARTITION BY {quoted_id} ORDER BY "__row_ord__"'
+            ') = 1 ORDER BY "__row_ord__"',
+        )
+        self._con.execute(f'DROP TABLE "{table_name}"')  # nosec B608 — validated name
+        self._con.execute(f'ALTER TABLE "{staging}" RENAME TO "{table_name}"')  # nosec B608 — validated names
+        LOGGER.warning(
+            "TableRegistry: entity %r dropped %d duplicate %r rows (%d → %d). "
+            "An entity's id must be unique; the first occurrence is kept. "
+            "If you loaded a fact table at the wrong grain, project to the "
+            "entity grain via the source's `query` field.",
+            label,
+            before - after,
+            id_col,
+            before,
+            after,
+        )
 
     def _merge_relationship_table(
         self,

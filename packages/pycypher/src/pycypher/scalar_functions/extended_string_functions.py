@@ -537,7 +537,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
                         pd.notna(s),
                         None,
                     )  # Null input → None output
-                except AttributeError, TypeError:
+                except (AttributeError, TypeError):
                     pass  # Fall through to explicit loop
 
         # General case: explicit loop with per-row search/from values
@@ -591,7 +591,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
             sv = str(val)
             try:
                 pos = int(i)  # ty: ignore[invalid-argument-type]  # i is numeric at runtime, guarded above
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
             if pos < 0 or pos >= len(sv):
                 return None
@@ -639,7 +639,7 @@ def register(registry: ScalarFunctionRegistry) -> None:
             else:
                 try:
                     result.append(chr(int(v)))
-                except ValueError, TypeError, OverflowError:
+                except (ValueError, TypeError, OverflowError):
                     # Invalid code point values return None
                     result.append(None)
         return pd.Series(result, dtype="object", index=s.index)

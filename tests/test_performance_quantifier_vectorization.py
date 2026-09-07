@@ -120,9 +120,7 @@ class TestQuantifierVectorizationImplementation:
     def test_vectorized_eval_quantifier_method_exists(self):
         """Test that vectorized eval_quantifier method exists in CollectionExpressionEvaluator."""
         frame = Mock()
-        evaluator = CollectionExpressionEvaluator(
-            frame, evaluator_factory=BindingExpressionEvaluator
-        )
+        evaluator = CollectionExpressionEvaluator(frame, evaluator_factory=BindingExpressionEvaluator)
 
         # After implementation, this method should exist
         # In red phase: will fail because method doesn't exist yet

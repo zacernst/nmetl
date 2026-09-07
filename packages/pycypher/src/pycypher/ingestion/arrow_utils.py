@@ -70,7 +70,7 @@ def _dedup_endpoints(table: pa.Table) -> pa.Table:
     # form.  The previous implementation called ``to_pandas()`` here, which
     # both materialised every key as a Python object and dragged pandas into
     # the import graph of every ingestion path — see Phase 1 of
-    # ``docs/fastopendata_pandas_free_design.md``.
+    # the FastOpenData pandas-free design (private repository).
     #
     # The comment it replaced justified pandas on the grounds that numpy's
     # 2D ``np.unique`` is fussy with object dtype.  That is true, and

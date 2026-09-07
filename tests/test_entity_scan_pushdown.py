@@ -410,10 +410,7 @@ class TestPushdownPerformance:
         t0 = time.perf_counter()
         for _ in range(20):
             frame = EntityScan("Person", "a").scan(large_context)
-            BindingFilter(
-                predicate=predicate,
-                evaluator_factory=BindingExpressionEvaluator,
-            ).apply(frame)
+            BindingFilter(predicate=predicate, evaluator_factory=BindingExpressionEvaluator).apply(frame)
         filter_time = time.perf_counter() - t0
 
         assert pushdown_time < filter_time, (

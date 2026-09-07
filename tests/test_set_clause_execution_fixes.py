@@ -350,9 +350,7 @@ class TestSetClausePerformanceBaseline:
         print(
             f"Pandas SET operation on 1000 rows: {execution_time:.3f} seconds",
         )
-        assert execution_time < perf_threshold(
-            5.0
-        )  # Should complete in under 5 seconds
+        assert execution_time < perf_threshold(5.0)  # Should complete in under 5 seconds
 
     def test_set_multiple_properties_performance(self):
         """Test performance of setting multiple properties simultaneously."""
@@ -402,6 +400,4 @@ class TestSetClausePerformanceBaseline:
         print(
             f"Multiple property SET on 500 rows: {execution_time:.3f} seconds",
         )
-        assert execution_time < perf_threshold(
-            3.0
-        )  # Should be reasonably fast
+        assert execution_time < perf_threshold(3.0)  # Should be reasonably fast

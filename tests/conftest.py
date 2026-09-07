@@ -51,7 +51,17 @@ def _clear_pending_sigalrm():
 
 @pytest.fixture(autouse=True)
 def _restore_shared_logger_level():
-    """Restore the shared logger level after each test."""
+    """Restore the shared logger's level and the global logging state.
+
+    Besides the logger level, this undoes two process-wide changes a test
+    (or code it imports) can leave behind and that silently break every
+    later logging assertion on the same xdist worker:
+
+    * ``logging.disable(...)`` -- raises ``logging.root.manager.disable``;
+      an example script imported by a test once left it at CRITICAL.
+    * ``LOGGER.disabled`` -- set by ``logging.config.dictConfig`` with the
+      default ``disable_existing_loggers=True``.
+    """
     import logging
 
     try:
@@ -60,9 +70,14 @@ def _restore_shared_logger_level():
         yield
         return
     original_level = LOGGER.level
+    original_disabled = LOGGER.disabled
+    original_global_disable = logging.root.manager.disable
     yield
     if LOGGER.level != original_level:
         LOGGER.setLevel(original_level)
+    LOGGER.disabled = original_disabled
+    if logging.root.manager.disable != original_global_disable:
+        logging.disable(original_global_disable)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +195,7 @@ def perf_threshold(seconds: float) -> float:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def safe_tracemalloc():
     """Start tracemalloc cleanly, stop it after the test.
 

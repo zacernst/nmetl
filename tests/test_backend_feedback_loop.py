@@ -72,7 +72,7 @@ class TestSelectBackendForQuery:
             from pycypher.backend_engine import DuckDBBackend
 
             backend = DuckDBBackend()
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             pytest.skip("DuckDB backend not available")
 
         result = select_backend_for_query(

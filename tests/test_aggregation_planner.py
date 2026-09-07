@@ -12,6 +12,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pandas as pd
+from pycypher.binding_evaluator import BindingExpressionEvaluator
 from pycypher.aggregation_planner import AggregationPlanner
 from pycypher.ast_models import (
     Comparison,
@@ -26,7 +27,6 @@ from pycypher.ast_models import (
     Unary,
     Variable,
 )
-from pycypher.binding_evaluator import BindingExpressionEvaluator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -59,9 +59,7 @@ class TestContainsAggregationBaseCases:
     """Test contains_aggregation for atomic / leaf expressions."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_none_expression(self) -> None:
         assert self.planner.contains_aggregation(None) is False
@@ -92,9 +90,7 @@ class TestContainsAggregationFunctions:
     """Test contains_aggregation for FunctionInvocation nodes."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_known_aggregation_count(self) -> None:
         assert (
@@ -187,9 +183,7 @@ class TestContainsAggregationDualPurpose:
     """Test min/max disambiguation: list-literal → scalar, else agg."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_min_with_property_is_aggregation(self) -> None:
         expr = _func("min", [_prop("p", "age")])
@@ -239,9 +233,7 @@ class TestContainsAggregationComposite:
     """Test aggregation detection through compound AST structures."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_binary_expression_left_agg(self) -> None:
         expr = Comparison(
@@ -310,9 +302,7 @@ class TestAggregateItemsSimpleProjection:
     """When no items contain aggregation, delegate to _simple_projection."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_simple_projection_variables(self) -> None:
         """Simple projection of variables returns DataFrame with correct aliases."""
@@ -331,9 +321,7 @@ class TestAggregateItemsSimpleProjection:
 
         items = [_return_item(Variable(name="x"), "x")]
 
-        self.planner._evaluator_factory = MagicMock(
-            return_value=evaluator_instance
-        )
+        self.planner._evaluator_factory = MagicMock(return_value=evaluator_instance)
         result = self.planner.aggregate_items(items, frame)
 
         assert list(result.columns) == ["x"]
@@ -349,9 +337,7 @@ class TestAggregateItemsFullTable:
     """All items are aggregations → single aggregated row."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_full_table_count_star(self) -> None:
         frame = MagicMock()
@@ -362,9 +348,7 @@ class TestAggregateItemsFullTable:
 
         items = [_return_item(CountStar(), "cnt")]
 
-        self.planner._evaluator_factory = MagicMock(
-            return_value=evaluator_instance
-        )
+        self.planner._evaluator_factory = MagicMock(return_value=evaluator_instance)
         result = self.planner.aggregate_items(items, frame)
 
         assert list(result.columns) == ["cnt"]
@@ -392,9 +376,7 @@ class TestAggregateItemsFullTable:
             _return_item(_func("avg", [_prop("p", "age")]), "avg_age"),
         ]
 
-        self.planner._evaluator_factory = MagicMock(
-            return_value=evaluator_instance
-        )
+        self.planner._evaluator_factory = MagicMock(return_value=evaluator_instance)
         result = self.planner.aggregate_items(items, frame)
 
         assert list(result.columns) == ["cnt", "avg_age"]
@@ -410,9 +392,7 @@ class TestAggregateItemsGrouped:
     """Mixed agg + non-agg items → grouped aggregation."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_grouped_aggregation_basic(self) -> None:
         """Group by a single key with a count aggregation."""
@@ -436,9 +416,7 @@ class TestAggregateItemsGrouped:
             _return_item(CountStar(), "cnt"),
         ]
 
-        self.planner._evaluator_factory = MagicMock(
-            return_value=evaluator_instance
-        )
+        self.planner._evaluator_factory = MagicMock(return_value=evaluator_instance)
         result = self.planner.aggregate_items(items, frame)
 
         assert "dept" in result.columns
@@ -498,9 +476,7 @@ class TestContainsAggregationFuncArgs:
     """Test argument normalisation paths in _contains_aggregation_in_func_args."""
 
     def setup_method(self) -> None:
-        self.planner = AggregationPlanner(
-            evaluator_factory=BindingExpressionEvaluator
-        )
+        self.planner = AggregationPlanner(evaluator_factory=BindingExpressionEvaluator)
 
     def test_dict_arguments_with_aggregation(self) -> None:
         """FunctionInvocation.arguments as dict with 'arguments' key."""

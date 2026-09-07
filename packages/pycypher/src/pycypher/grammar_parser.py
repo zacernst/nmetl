@@ -987,7 +987,7 @@ class GrammarParser:
         try:
             self.parse(query)
             return True
-        except UnexpectedInput, CypherSyntaxError:
+        except (UnexpectedInput, CypherSyntaxError):
             return False
 
 

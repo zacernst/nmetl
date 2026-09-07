@@ -134,9 +134,7 @@ class TestOptimizerAwareRecommendations:
             hints={"cardinality_estimates": {"Person": 200_000}},
         )
         recs = _recs(optimization_plan=plan)
-        assert any(
-            "backend='duckdb'" in r or "backend='auto'" in r for r in recs
-        )
+        assert any("backend='duckdb'" in r or "backend='auto'" in r for r in recs)
 
     def test_no_backend_suggestion_low_cardinality(self) -> None:
         """No backend suggestion for low cardinality."""
@@ -235,9 +233,9 @@ class TestWorkloadAnalysis:
 
     def test_slow_parse_pattern(self) -> None:
         """Detects repeated slow parse times."""
-        history = [self._make_report(parse_time_ms=80.0) for _ in range(8)] + [
-            self._make_report(parse_time_ms=5.0) for _ in range(2)
-        ]
+        history = [
+            self._make_report(parse_time_ms=80.0) for _ in range(8)
+        ] + [self._make_report(parse_time_ms=5.0) for _ in range(2)]
         recs = analyze_workload(history)
         assert any("slow parse" in r.lower() for r in recs)
 
@@ -251,9 +249,9 @@ class TestWorkloadAnalysis:
 
     def test_large_results_pattern(self) -> None:
         """Detects consistently large result sets."""
-        history = [self._make_report(row_count=50_000) for _ in range(8)] + [
-            self._make_report(row_count=100) for _ in range(2)
-        ]
+        history = [
+            self._make_report(row_count=50_000) for _ in range(8)
+        ] + [self._make_report(row_count=100) for _ in range(2)]
         recs = analyze_workload(history)
         assert any("10K rows" in r for r in recs)
 

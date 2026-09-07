@@ -1,4 +1,4 @@
-"""Phase 2b-ii (docs/fastopendata_streaming_qualification_plan.md) —
+"""Phase 2b-ii (the FastOpenData streaming-qualification plan (private repository)) —
 relationship property-copy ``SET`` mutation eligibility (Phase 2 long-tail
 category (B)).
 
@@ -255,13 +255,14 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_set_expression_not_bare_alias_with_with(
+    def test_eligible_set_expression_after_with(
         self, result_parquet, county_parquet, located_in_parquet
     ) -> None:
+        # Plan translator: a SET value may be any compilable expression over the scope (was a shape restriction).
         ctx = _streamed_context(
             result_parquet, county_parquet, located_in_parquet
         )
-        assert not is_relation_copy_set_eligible(
+        assert is_relation_copy_set_eligible(
             _ast(
                 "MATCH (e:CountyElectionResult)-[:LOCATED_IN]->(c:County) "
                 "WITH c, e.rep_votes AS rep_votes "
@@ -270,9 +271,10 @@ class TestEligibility:
             ctx,
         )
 
-    def test_ineligible_no_streaming_source(
+    def test_eligible_in_memory_source_is_materialised(
         self, result_parquet, located_in_parquet
     ) -> None:
+        # Plan catalog: an in-memory-only label is materialised into a registry table on first use, so it is writable.
         ctx = _streaming_ctx()
         register_streaming_source(
             ctx,
@@ -293,7 +295,7 @@ class TestEligibility:
         ctx.entity_mapping.mapping["County"] = EntityTable.from_dataframe(
             "County", counties
         )
-        assert not is_relation_copy_set_eligible(_ast(_NO_WITH_QUERY), ctx)
+        assert is_relation_copy_set_eligible(_ast(_NO_WITH_QUERY), ctx)
 
     def test_ineligible_pandas_backend(self) -> None:
         ctx = _pandas_ctx()
@@ -375,7 +377,7 @@ class TestExecution:
 
 
 class TestNewColumn:
-    """Phase 3a (docs/fastopendata_streaming_qualification_plan.md) -- a
+    """Phase 3a (the FastOpenData streaming-qualification plan (private repository)) -- a
     SET target property that doesn't exist yet in the raw file is created
     via ALTER TABLE rather than making the whole query ineligible. Also
     closes a pre-existing bug found while building this: is_relation_

@@ -3,7 +3,8 @@
 Validates that:
 - All symbols in __all__ are importable from pycypher.ingestion
 - Key classes are the correct types
-- The package-level convenience imports work as documented
+- Names that moved to the nmetl package fail with a pointer to their new home
+- pycypher.ingestion never imports nmetl (the dependency is one-way)
 """
 
 from __future__ import annotations
@@ -28,44 +29,23 @@ class TestIngestionAllExports:
 class TestIngestionKeyClasses:
     """Spot-check that key re-exported classes are the expected types."""
 
-    def test_context_builder_is_class(self):
-        assert isinstance(ingestion_pkg.ContextBuilder, type)
-
-    def test_csv_format_is_class(self):
-        assert isinstance(ingestion_pkg.CsvFormat, type)
-
-    def test_parquet_format_is_class(self):
-        assert isinstance(ingestion_pkg.ParquetFormat, type)
-
-    def test_json_format_is_class(self):
-        assert isinstance(ingestion_pkg.JsonFormat, type)
-
-    def test_file_data_source_is_class(self):
-        assert isinstance(ingestion_pkg.FileDataSource, type)
-
-    def test_dataframe_data_source_is_class(self):
-        assert isinstance(ingestion_pkg.DataFrameDataSource, type)
-
-    def test_arrow_data_source_is_class(self):
-        assert isinstance(ingestion_pkg.ArrowDataSource, type)
-
-    def test_sql_data_source_is_class(self):
-        assert isinstance(ingestion_pkg.SqlDataSource, type)
-
-    def test_pipeline_config_is_class(self):
-        assert isinstance(ingestion_pkg.PipelineConfig, type)
-
-    def test_validation_result_is_class(self):
-        assert isinstance(ingestion_pkg.ValidationResult, type)
-
-    def test_duckdb_reader_is_class(self):
-        assert isinstance(ingestion_pkg.DuckDBReader, type)
-
-    def test_data_sampler_is_class(self):
-        assert isinstance(ingestion_pkg.DataSampler, type)
-
-    def test_pipeline_builder_is_class(self):
-        assert isinstance(ingestion_pkg.PipelineBuilder, type)
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "ContextBuilder",
+            "CsvFormat",
+            "ParquetFormat",
+            "JsonFormat",
+            "FileDataSource",
+            "DataFrameDataSource",
+            "ArrowDataSource",
+            "SqlDataSource",
+            "DuckDBReader",
+            "OutputFormat",
+        ],
+    )
+    def test_is_class(self, name: str):
+        assert isinstance(getattr(ingestion_pkg, name), type)
 
 
 class TestIngestionFunctions:
@@ -76,15 +56,6 @@ class TestIngestionFunctions:
 
     def test_write_dataframe_to_uri_is_callable(self):
         assert callable(ingestion_pkg.write_dataframe_to_uri)
-
-    def test_load_pipeline_config_is_callable(self):
-        assert callable(ingestion_pkg.load_pipeline_config)
-
-    def test_validate_config_is_callable(self):
-        assert callable(ingestion_pkg.validate_config)
-
-    def test_validate_config_dict_is_callable(self):
-        assert callable(ingestion_pkg.validate_config_dict)
 
 
 class TestIngestionSubmoduleConsistency:
@@ -100,17 +71,53 @@ class TestIngestionSubmoduleConsistency:
 
         assert ingestion_pkg.CsvFormat is CsvFormat
 
-    def test_pipeline_config_same_object(self):
-        from pycypher.ingestion.config import PipelineConfig
-
-        assert ingestion_pkg.PipelineConfig is PipelineConfig
-
-    def test_validation_result_same_object(self):
-        from pycypher.ingestion.validation import ValidationResult
-
-        assert ingestion_pkg.ValidationResult is ValidationResult
-
     def test_duckdb_reader_same_object(self):
         from pycypher.ingestion.duckdb_reader import DuckDBReader
 
         assert ingestion_pkg.DuckDBReader is DuckDBReader
+
+    def test_output_format_same_object(self):
+        from pycypher.ingestion.output_writer import OutputFormat
+
+        assert ingestion_pkg.OutputFormat is OutputFormat
+
+
+class TestMovedToNmetl:
+    """Pipeline-config names now live in nmetl; stale imports must say so."""
+
+    @pytest.mark.parametrize(
+        ("name", "new_home"),
+        [
+            ("PipelineConfig", "nmetl.config"),
+            ("load_pipeline_config", "nmetl.config"),
+            ("validate_config", "nmetl.validation"),
+            ("PipelineBuilder", "nmetl.pipeline_builder"),
+            ("DataSourceIntrospector", "nmetl.introspector"),
+            ("DataSampler", "nmetl.data_preview"),
+        ],
+    )
+    def test_stale_import_points_to_new_home(self, name: str, new_home: str):
+        with pytest.raises(AttributeError, match=new_home):
+            getattr(ingestion_pkg, name)
+        assert name not in ingestion_pkg.__all__
+
+    def test_unknown_name_is_a_plain_attribute_error(self):
+        with pytest.raises(AttributeError, match="no attribute"):
+            ingestion_pkg.definitely_not_a_thing  # noqa: B018
+
+    def test_pycypher_does_not_import_nmetl(self):
+        import subprocess
+        import sys
+
+        code = (
+            "import sys, pycypher, pycypher.ingestion, pycypher.star, "
+            "pycypher.relation_engine; "
+            "print(sorted(m for m in sys.modules if m.split('.')[0] == 'nmetl'))"
+        )
+        out = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert out.stdout.strip() == "[]"

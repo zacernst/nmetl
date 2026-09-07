@@ -18,6 +18,7 @@ from pycypher.relational_models import (
     RelationshipTable,
 )
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -26,20 +27,16 @@ from pycypher.relational_models import (
 @pytest.fixture
 def executor_context() -> Context:
     """Context for executor testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3],
-            "name": ["Alice", "Bob", "Carol"],
-            "age": [30, 25, 35],
-        }
-    )
-    knows_df = pd.DataFrame(
-        {
-            "__ID__": [101, 102],
-            "__SOURCE__": [1, 2],
-            "__TARGET__": [2, 3],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3],
+        "name": ["Alice", "Bob", "Carol"],
+        "age": [30, 25, 35],
+    })
+    knows_df = pd.DataFrame({
+        "__ID__": [101, 102],
+        "__SOURCE__": [1, 2],
+        "__TARGET__": [2, 3],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -62,9 +59,7 @@ def executor_context() -> Context:
 
     return Context(
         entity_mapping=EntityMapping(mapping={"Person": person_table}),
-        relationship_mapping=RelationshipMapping(
-            mapping={"KNOWS": knows_table}
-        ),
+        relationship_mapping=RelationshipMapping(mapping={"KNOWS": knows_table}),
     )
 
 
@@ -104,9 +99,7 @@ class TestClauseExecutorDispatchRouting:
         """Executor initializes with context."""
         assert executor._context is not None
 
-    def test_executor_has_context_reference(
-        self, executor: ClauseExecutor
-    ) -> None:
+    def test_executor_has_context_reference(self, executor: ClauseExecutor) -> None:
         """Executor maintains context reference."""
         assert "Person" in executor._context.entity_mapping.mapping
 

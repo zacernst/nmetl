@@ -63,15 +63,8 @@ class TestFileRelation:
 
     def test_relation_matches_read(self, con, people_parquet) -> None:
         ds = data_source_from_uri(str(people_parquet))
-        via_relation = (
-            ds.read_relation(con)
-            .to_pandas()
-            .sort_values("id")
-            .reset_index(drop=True)
-        )
-        via_arrow = (
-            ds.read().to_pandas().sort_values("id").reset_index(drop=True)
-        )
+        via_relation = ds.read_relation(con).to_pandas().sort_values("id").reset_index(drop=True)
+        via_arrow = ds.read().to_pandas().sort_values("id").reset_index(drop=True)
         pd.testing.assert_frame_equal(via_relation, via_arrow)
 
     def test_csv_relation(self, con, people_csv) -> None:
@@ -79,9 +72,7 @@ class TestFileRelation:
         out = ds.read_relation(con).to_pandas()
         assert sorted(out["name"].tolist()) == ["Alice", "Bob", "Carol"]
 
-    def test_row_count_without_full_materialise(
-        self, con, people_parquet
-    ) -> None:
+    def test_row_count_without_full_materialise(self, con, people_parquet) -> None:
         ds = data_source_from_uri(str(people_parquet))
         rel = ds.read_relation(con)
         assert len(rel) == 4  # COUNT(*), no fetchdf
@@ -90,9 +81,7 @@ class TestFileRelation:
 
 class TestSchemaHintsAndQuery:
     def test_schema_hint_cast(self, con, people_csv) -> None:
-        ds = data_source_from_uri(
-            str(people_csv), schema_hints={"age": "VARCHAR"}
-        )
+        ds = data_source_from_uri(str(people_csv), schema_hints={"age": "VARCHAR"})
         out = ds.read_relation(con).to_pandas().sort_values("id")
         # age was hinted to VARCHAR, so values come back as strings not ints.
         assert out["age"].tolist() == ["30", "25", "35"]
@@ -108,17 +97,11 @@ class TestSchemaHintsAndQuery:
 
 
 class TestSharedConnection:
-    def test_two_sources_no_collision(
-        self, con, people_parquet, people_csv
-    ) -> None:
+    def test_two_sources_no_collision(self, con, people_parquet, people_csv) -> None:
         # Both sources use a `source` CTE; on one shared connection they must
         # not collide.
-        a = data_source_from_uri(
-            str(people_parquet), query="SELECT id FROM source WHERE age > 29"
-        )
-        b = data_source_from_uri(
-            str(people_csv), query="SELECT id FROM source WHERE age < 30"
-        )
+        a = data_source_from_uri(str(people_parquet), query="SELECT id FROM source WHERE age > 29")
+        b = data_source_from_uri(str(people_csv), query="SELECT id FROM source WHERE age < 30")
         out_a = a.read_relation(con).to_pandas()
         out_b = b.read_relation(con).to_pandas()
         assert sorted(out_a["id"].tolist()) == [1, 3]

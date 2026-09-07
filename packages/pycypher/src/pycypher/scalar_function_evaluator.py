@@ -321,7 +321,7 @@ class ScalarFunctionEvaluator:
                     ]
                     n = len(self.frame)
                     return _broadcast_series(prop_keys, n)
-                except KeyError, AttributeError:
+                except (KeyError, AttributeError):
                     if _DEBUG_ENABLED:
                         LOGGER.debug(
                             "keys() introspection failed for variable %r; falling through to registry",
@@ -404,7 +404,7 @@ class ScalarFunctionEvaluator:
                         .fillna({})
                         .reset_index(drop=True)
                     )
-                except KeyError, AttributeError:
+                except (KeyError, AttributeError):
                     if _DEBUG_ENABLED:
                         LOGGER.debug(
                             "properties() introspection failed for variable %r; falling through to registry",
@@ -462,7 +462,7 @@ class ScalarFunctionEvaluator:
                     lookup: pd.Series = raw_df.set_index(_ID_COL)[endpoint_col]
                     id_series = self.frame.bindings[var_name]
                     return id_series.map(lookup).reset_index(drop=True)
-                except KeyError, AttributeError:
+                except (KeyError, AttributeError):
                     if _DEBUG_ENABLED:
                         LOGGER.debug(
                             "startNode/endNode introspection failed for variable %r; falling through to registry",

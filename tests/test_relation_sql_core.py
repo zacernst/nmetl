@@ -16,6 +16,7 @@ from pycypher.relational_models import (
 )
 from pycypher.star import Star
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -24,15 +25,13 @@ from pycypher.star import Star
 @pytest.fixture
 def sql_star() -> Star:
     """Star for SQL compilation testing."""
-    people_df = pd.DataFrame(
-        {
-            "__ID__": [1, 2, 3],
-            "name": ["Alice", "Bob", "Carol"],
-            "age": [30, 25, 35],
-            "salary": [100000.0, 80000.0, 110000.0],
-            "active": [True, False, True],
-        }
-    )
+    people_df = pd.DataFrame({
+        "__ID__": [1, 2, 3],
+        "name": ["Alice", "Bob", "Carol"],
+        "age": [30, 25, 35],
+        "salary": [100000.0, 80000.0, 110000.0],
+        "active": [True, False, True],
+    })
 
     person_table = EntityTable(
         entity_type="Person",
@@ -93,9 +92,7 @@ class TestRelationSQLExpressionCompilation:
 
     def test_compile_property_access(self, sql_star: Star) -> None:
         """Compile n.age → column reference."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN n.age ORDER BY n.age"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN n.age ORDER BY n.age")
         assert len(result) == 3
 
     def test_compile_arithmetic_addition(self, sql_star: Star) -> None:
@@ -120,16 +117,12 @@ class TestRelationSQLExpressionCompilation:
 
     def test_compile_string_concatenation(self, sql_star: Star) -> None:
         """Compile s1 + s2 → SQL concat."""
-        result = sql_star.execute_query(
-            "RETURN 'hello' + ' ' + 'world' as msg"
-        )
+        result = sql_star.execute_query("RETURN 'hello' + ' ' + 'world' as msg")
         assert result.iloc[0]["msg"] == "hello world"
 
     def test_compile_function_call(self, sql_star: Star) -> None:
         """Compile COUNT(n) → SQL function."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
 
@@ -143,44 +136,32 @@ class TestRelationSQLPredicateCompilation:
 
     def test_compile_equality(self, sql_star: Star) -> None:
         """Compile n.age = 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age = 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age = 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 1
 
     def test_compile_not_equal(self, sql_star: Star) -> None:
         """Compile n.age <> 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age <> 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age <> 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 2
 
     def test_compile_less_than(self, sql_star: Star) -> None:
         """Compile n.age < 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age < 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age < 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 1  # Bob (25)
 
     def test_compile_greater_than(self, sql_star: Star) -> None:
         """Compile n.age > 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age > 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age > 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 1  # Carol (35)
 
     def test_compile_less_equal(self, sql_star: Star) -> None:
         """Compile n.age <= 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age <= 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age <= 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 2  # Alice, Bob
 
     def test_compile_greater_equal(self, sql_star: Star) -> None:
         """Compile n.age >= 30."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age >= 30 RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age >= 30 RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 2  # Alice, Carol
 
     def test_compile_and_predicate(self, sql_star: Star) -> None:
@@ -206,16 +187,12 @@ class TestRelationSQLPredicateCompilation:
 
     def test_compile_null_check(self, sql_star: Star) -> None:
         """Compile n.age IS NULL."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age IS NULL RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age IS NULL RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 0
 
     def test_compile_not_null_check(self, sql_star: Star) -> None:
         """Compile n.age IS NOT NULL."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) WHERE n.age IS NOT NULL RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) WHERE n.age IS NOT NULL RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
     def test_compile_in_list(self, sql_star: Star) -> None:
@@ -267,44 +244,32 @@ class TestRelationSQLAggregationCompilation:
 
     def test_compile_count_all(self, sql_star: Star) -> None:
         """Compile COUNT(*)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
     def test_compile_count_distinct(self, sql_star: Star) -> None:
         """Compile COUNT(DISTINCT n)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(DISTINCT n) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN COUNT(DISTINCT n) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
     def test_compile_sum_aggregate(self, sql_star: Star) -> None:
         """Compile SUM(n.age)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN SUM(n.age) as total"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN SUM(n.age) as total")
         assert result.iloc[0]["total"] == 90  # 30 + 25 + 35
 
     def test_compile_avg_aggregate(self, sql_star: Star) -> None:
         """Compile AVG(n.age)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN AVG(n.age) as avg_age"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN AVG(n.age) as avg_age")
         assert abs(result.iloc[0]["avg_age"] - 30.0) < 0.1
 
     def test_compile_min_aggregate(self, sql_star: Star) -> None:
         """Compile MIN(n.age)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN MIN(n.age) as min_age"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN MIN(n.age) as min_age")
         assert result.iloc[0]["min_age"] == 25
 
     def test_compile_max_aggregate(self, sql_star: Star) -> None:
         """Compile MAX(n.age)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN MAX(n.age) as max_age"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN MAX(n.age) as max_age")
         assert result.iloc[0]["max_age"] == 35
 
     def test_compile_group_by(self, sql_star: Star) -> None:
@@ -335,9 +300,7 @@ class TestRelationSQLJoinCompilation:
 
     def test_left_join_behavior(self, sql_star: Star) -> None:
         """LEFT JOIN semantics (if supported)."""
-        result = sql_star.execute_query(
-            "MATCH (n:Person) RETURN COUNT(*) as cnt"
-        )
+        result = sql_star.execute_query("MATCH (n:Person) RETURN COUNT(*) as cnt")
         assert result.iloc[0]["cnt"] == 3
 
 
@@ -396,3 +359,62 @@ class TestRelationSQLPerformance:
         )
         assert result.iloc[0]["cnt"] == 2
         assert result.iloc[0]["total"] == 65  # 30 + 35
+
+
+class TestTypeConversionFunctions:
+    """``toFloat``/``toInteger`` (and their ``OrNull`` aliases) compile to
+    ``TRY_CAST`` so unparseable input is NULL, as in the pandas engine, and
+    ``toInteger`` truncates toward zero rather than rounding.
+    """
+
+    @staticmethod
+    def _compile(cypher_expr: str) -> str | None:
+        from pycypher.ast_converter import ASTConverter
+        from pycypher.relation_sql import compile_expression
+
+        ast = ASTConverter.from_cypher(
+            f"MATCH (p:Person) RETURN {cypher_expr} AS x"
+        )
+        expr = ast.clauses[-1].items[0].expression
+        return compile_expression(
+            expr, lambda var, prop: f'"{prop}"' if var == "p" else None
+        )
+
+    def test_to_float(self) -> None:
+        assert self._compile("toFloat(p.age)") == 'TRY_CAST("age" AS DOUBLE)'
+        assert (
+            self._compile("toFloatOrNull(p.age)")
+            == 'TRY_CAST("age" AS DOUBLE)'
+        )
+
+    def test_to_integer_truncates(self) -> None:
+        assert (
+            self._compile("toInteger(p.salary)")
+            == 'TRY_CAST(TRUNC(TRY_CAST("salary" AS DOUBLE)) AS BIGINT)'
+        )
+
+    def test_wrong_arity_is_ineligible(self) -> None:
+        assert self._compile("toFloat(p.age, p.salary)") is None
+
+    def test_semantics_match_cypher(self) -> None:
+        import duckdb
+        from pycypher.ast_converter import ASTConverter
+        from pycypher.relation_sql import compile_expression
+
+        con = duckdb.connect()
+        con.execute(
+            "CREATE TABLE t AS SELECT * FROM (VALUES "
+            "('3.7'), ('-3.7'), ('abc'), (NULL)) v(s)"
+        )
+        ast = ASTConverter.from_cypher(
+            "MATCH (p:Person) RETURN toFloat(p.s) AS f, toInteger(p.s) AS i"
+        )
+        items = ast.clauses[-1].items
+
+        def resolve(_var: str, prop: str) -> str:
+            return f'"{prop}"'
+
+        f_sql = compile_expression(items[0].expression, resolve)
+        i_sql = compile_expression(items[1].expression, resolve)
+        rows = con.execute(f"SELECT {f_sql}, {i_sql} FROM t").fetchall()  # noqa: S608 -- compiled from a fixed literal, test-only
+        assert rows == [(3.7, 3), (-3.7, -3), (None, None), (None, None)]
