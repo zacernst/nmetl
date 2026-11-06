@@ -528,6 +528,66 @@ def bridge_user_functions(context: Context) -> None:
             )
 
 
+def resync_streaming_sources(context: Context) -> None:
+    """Re-point ``context._streaming_sources`` at the registry's current frames.
+
+    ``register_streaming_source`` mirrors each entity's registration onto
+    ``context._streaming_sources`` as a read-through alias, and
+    :func:`_base_relation` prefers that alias over the table registry. A
+    :meth:`~pycypher.backends.table_registry.TableRegistry.rebind` (run by
+    :meth:`~pycypher.backends.duckdb_backend.DuckDBBackend.cycle_connection`)
+    refreshes the registry's own records but has no way to reach this
+    alias, so without this call ``_base_relation`` would keep serving the
+    pre-cycle frame — bound to the now-closed connection — for every entity
+    already registered. Relationships need no equivalent: they are read
+    straight from the table registry (see ``register_streaming_relationship``'s
+    docstring), never aliased onto ``context``.
+    """
+    from pycypher.backends.table_registry import ENTITY_KIND
+
+    tables = context.backend.tables
+    for label in context._streaming_sources:
+        entry = tables.get(label, ENTITY_KIND)
+        if entry is not None:
+            context._streaming_sources[label] = (
+                entry.frame,
+                entry.attr_map,
+                entry.id_col,
+            )
+
+
+def rebridge_user_functions(context: Context) -> None:
+    """Re-create every bridged UDF on the context's current connection.
+
+    :func:`register_relation_udf` is idempotent *within* one connection's
+    lifetime — ``context._relation_udfs`` guards against re-registering a
+    name DuckDB already has. That guard does not know
+    :meth:`~pycypher.backends.duckdb_backend.DuckDBBackend.cycle_connection`
+    swapped the connection underneath it: the names it already holds were
+    created on the now-closed connection and no longer exist anywhere. Call
+    this after a cycle to clear the guard and re-run the bridge against the
+    new connection.
+    """
+    context._relation_udfs.clear()
+    bridge_user_functions(context)
+
+
+def cycle_streaming_connection(context: Context) -> None:
+    """Cycle the backend's connection and re-establish everything bound to it.
+
+    :meth:`DuckDBBackend.cycle_connection` closes and reopens the
+    connection to reclaim buffer-pool RSS, and already rebinds the table
+    registry. A streaming run binds two more things to the connection that
+    the backend does not know about: the ``context._streaming_sources``
+    alias cache (:func:`resync_streaming_sources`) and bridged user
+    functions (:func:`rebridge_user_functions`). This wraps all three so
+    callers (``nmetl``'s pipeline loop) have one entry point.
+    """
+    context.backend.cycle_connection()
+    resync_streaming_sources(context)
+    rebridge_user_functions(context)
+
+
 def _entity_attr_map(context: Context, label: str) -> dict[str, str] | None:
     """Property→column map for *label*.
 
