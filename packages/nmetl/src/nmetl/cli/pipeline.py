@@ -31,6 +31,30 @@ _REMOTE_SCHEMES: frozenset[str] = frozenset(
     {"s3", "gs", "gcs", "abfss", "az", "http", "https", "ftp", "sftp"}
 )
 
+_CYCLE_EVERY_ENV_VAR = "PYCYPHER_DUCKDB_CYCLE_EVERY"
+
+
+def _cycle_every() -> int | None:
+    """Sources per DuckDB connection cycle during streaming registration.
+
+    ``None`` disables cycling entirely, which is the default: a streaming
+    run with enough entity/relationship sources keeps every one's table
+    resident on a single connection for the whole run (board 86bcqr38m /
+    86bcqm58n — the national CJARS pipeline OOMs this way), but cycling buys
+    nothing unless a memory budget is also set (closing a connection reclaims
+    buffer-pool pages; DuckDB has nothing to evict in the first place without
+    ``PYCYPHER_DUCKDB_MEMORY_LIMIT``), so this stays opt-in rather than
+    defaulting on.
+    """
+    raw = os.environ.get(_CYCLE_EVERY_ENV_VAR, "").strip()
+    if not raw:
+        return None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None
+    return n if n > 0 else None
+
 
 def _load_query_text(source: str, config_dir: Path) -> str:
     """Load Cypher query text from a URI or relative path.
@@ -602,6 +626,7 @@ def _try_streaming_run(
     from pycypher.ingestion.data_sources import data_source_from_uri
     from pycypher.relation_engine import (
         bridge_user_functions,
+        cycle_streaming_connection,
         execute_relation_mutation,
         execute_relation_query,
         register_streaming_relationship,
@@ -645,6 +670,8 @@ def _try_streaming_run(
         plan: list[tuple[int, Any, str, list[Any]]] = []
         tracker = ErrorPolicyTracker((on_error or "fail").lower())
         stream_errors = _QUERY_EXEC_ERRORS + _OUTPUT_ERRORS
+        cycle_every = _cycle_every()
+        sources_since_cycle = 0
         try:
             for entity_src in pipeline_config.sources.entities:
                 ds = data_source_from_uri(
@@ -658,6 +685,10 @@ def _try_streaming_run(
                     ds,
                     id_col=entity_src.id_col,
                 )
+                sources_since_cycle += 1
+                if cycle_every and sources_since_cycle >= cycle_every:
+                    cycle_streaming_connection(context)
+                    sources_since_cycle = 0
 
             for rel_src in pipeline_config.sources.relationships:
                 rel_ds = data_source_from_uri(
@@ -676,6 +707,10 @@ def _try_streaming_run(
                     source_entity_type=rel_src.source_entity_type,
                     target_entity_type=rel_src.target_entity_type,
                 )
+                sources_since_cycle += 1
+                if cycle_every and sources_since_cycle >= cycle_every:
+                    cycle_streaming_connection(context)
+                    sources_since_cycle = 0
 
         except Exception as exc:  # noqa: BLE001 — any registration failure is fatal: there is no in-memory fallback once streaming is requested
             raise click.ClickException(
