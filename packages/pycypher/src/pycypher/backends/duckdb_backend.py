@@ -579,6 +579,7 @@ class DuckDBBackend:
         self._own_database_file: bool = bool(
             own_database_file and database_path
         )
+        self._config: dict[str, Any] = config
         self._conn: Any = duckdb.connect(
             database_path or ":memory:", config=config
         )
@@ -619,6 +620,41 @@ class DuckDBBackend:
                 # connection; drop them rather than hand out dead handles.
                 self._tables = None
                 self._remove_owned_database_file()
+
+    def cycle_connection(self) -> None:
+        """Close and reopen the connection to reclaim buffer-pool RSS.
+
+        Measured (ticket 86bcqr38m / 86bcqm58n, FastOpenData board):
+        ``DROP TABLE`` plus ``CHECKPOINT`` inside a live connection gives
+        nothing back to the OS across seven cycles against a 256MB-limited,
+        file-backed database — only closing the connection released memory
+        (~207MB, once). This method is that release, made safe to call mid
+        -run: every table a :class:`TableRegistry` has registered lives in
+        the file-backed database, not the connection, so it survives the
+        cycle; only the cached relation handles need re-reading, which
+        :meth:`TableRegistry.rebind` does.
+
+        Raises:
+            ValueError: If this backend has no file-backed database — an
+                in-memory connection has nothing to reconnect to, and
+                closing it would discard every table it holds.
+
+        """
+        if self._database_path is None:
+            msg = (
+                "cycle_connection() requires a file-backed database_path; "
+                "a :memory: connection has nothing to reconnect to, and "
+                "closing it would discard every registered table."
+            )
+            raise ValueError(msg)
+        import duckdb
+
+        if self._conn is not None:
+            self._conn.close()
+        self._conn = duckdb.connect(self._database_path, config=self._config)
+        self._conn.execute("SET arrow_large_buffer_size=true")
+        if self._tables is not None:
+            self._tables.rebind(self._conn)
 
     def _remove_owned_database_file(self) -> None:
         """Delete the scratch database file, if this backend owns it.
