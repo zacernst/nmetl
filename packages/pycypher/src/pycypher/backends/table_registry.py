@@ -521,6 +521,26 @@ class TableRegistry:
         self._tables[kind, label] = entry
         return entry
 
+    def rebind(self, connection: Any) -> None:
+        """Point every registered table at *connection* after a cycle.
+
+        Call immediately after :meth:`DuckDBBackend.cycle_connection` swaps
+        in a fresh connection to the same file-backed database. Every
+        cached :class:`RegisteredTable` holds a relation handle bound to the
+        now-closed connection; this re-reads each one from the new
+        connection via :meth:`refresh`, in the same way a streaming
+        entity's post-pass already does for a single label. The physical
+        tables themselves are untouched — they live in the database file,
+        not the connection that was closed.
+
+        Args:
+            connection: The new, already-open ``duckdb.DuckDBPyConnection``.
+
+        """
+        self._con = connection
+        for kind, label in list(self._tables):
+            self.refresh(label, kind)
+
     # -- Lookup ---------------------------------------------------------
 
     def get(
