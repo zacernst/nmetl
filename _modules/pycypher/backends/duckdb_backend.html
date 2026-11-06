@@ -1792,6 +1792,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_own_database_file</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span>
             <span class="n">own_database_file</span> <span class="ow">and</span> <span class="n">database_path</span>
         <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
             <span class="n">database_path</span> <span class="ow">or</span> <span class="s2">":memory:"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span>
         <span class="p">)</span>
@@ -1835,6 +1836,44 @@
                 <span class="c1"># connection; drop them rather than hand out dead handles.</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="o">=</span> <span class="kc">None</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_remove_owned_database_file</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DuckDBBackend.cycle_connection">
+<a class="viewcode-back" href="../../../api/pycypher.html#pycypher.backend_engine.DuckDBBackend.cycle_connection">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cycle_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Close and reopen the connection to reclaim buffer-pool RSS.</span>
+
+<span class="sd">        Measured (ticket 86bcqr38m / 86bcqm58n, FastOpenData board):</span>
+<span class="sd">        ``DROP TABLE`` plus ``CHECKPOINT`` inside a live connection gives</span>
+<span class="sd">        nothing back to the OS across seven cycles against a 256MB-limited,</span>
+<span class="sd">        file-backed database — only closing the connection released memory</span>
+<span class="sd">        (~207MB, once). This method is that release, made safe to call mid</span>
+<span class="sd">        -run: every table a :class:`TableRegistry` has registered lives in</span>
+<span class="sd">        the file-backed database, not the connection, so it survives the</span>
+<span class="sd">        cycle; only the cached relation handles need re-reading, which</span>
+<span class="sd">        :meth:`TableRegistry.rebind` does.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If this backend has no file-backed database — an</span>
+<span class="sd">                in-memory connection has nothing to reconnect to, and</span>
+<span class="sd">                closing it would discard every table it holds.</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_database_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"cycle_connection() requires a file-backed database_path; "</span>
+                <span class="s2">"a :memory: connection has nothing to reconnect to, and "</span>
+                <span class="s2">"closing it would discard every registered table."</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_database_path</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"SET arrow_large_buffer_size=true"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tables</span><span class="o">.</span><span class="n">rebind</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_remove_owned_database_file</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

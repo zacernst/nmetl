@@ -12929,6 +12929,28 @@ compatible — see <code class="xref py py-meth docutils literal notranslate"><s
 relations on the same (spill-configured) connection the backend uses.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="pycypher.backend_engine.DuckDBBackend.cycle_connection">
+<span class="sig-name descname"><span class="pre">cycle_connection</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/backends/duckdb_backend.html#DuckDBBackend.cycle_connection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.backend_engine.DuckDBBackend.cycle_connection" title="Link to this definition"></a></dt>
+<dd><p>Close and reopen the connection to reclaim buffer-pool RSS.</p>
+<p>Measured (ticket 86bcqr38m / 86bcqm58n, FastOpenData board):
+<code class="docutils literal notranslate"><span class="pre">DROP</span> <span class="pre">TABLE</span></code> plus <code class="docutils literal notranslate"><span class="pre">CHECKPOINT</span></code> inside a live connection gives
+nothing back to the OS across seven cycles against a 256MB-limited,
+file-backed database — only closing the connection released memory
+(~207MB, once). This method is that release, made safe to call mid
+-run: every table a <code class="xref py py-class docutils literal notranslate"><span class="pre">TableRegistry</span></code> has registered lives in
+the file-backed database, not the connection, so it survives the
+cycle; only the cached relation handles need re-reading, which
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">TableRegistry.rebind()</span></code> does.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If this backend has no file-backed database — an
+    in-memory connection has nothing to reconnect to, and
+    closing it would discard every table it holds.</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="pycypher.backend_engine.DuckDBBackend.database_path">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">database_path</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></em><a class="headerlink" href="#pycypher.backend_engine.DuckDBBackend.database_path" title="Link to this definition"></a></dt>
