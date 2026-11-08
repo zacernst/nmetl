@@ -684,6 +684,22 @@ class InstrumentedBackend:
         """
         return self._inner.tables
 
+    def cycle_connection(self) -> None:
+        """Proxy the inner backend's connection-cycling primitive, if any.
+
+        Same rationale as :attr:`connection` and :attr:`tables` -- this is
+        a DuckDB-specific extension (:meth:`DuckDBBackend.cycle_connection`),
+        not part of the ``BackendEngine`` protocol, so it is not covered by
+        any generic delegation. Without this, ``nmetl run -v`` (which wraps
+        every backend in :class:`InstrumentedBackend`, see
+        :func:`select_backend`) combined with
+        ``PYCYPHER_DUCKDB_CYCLE_EVERY`` raises ``AttributeError`` the first
+        time a streaming run tries to cycle the connection -- found running
+        the real national pipeline with both flags set together (ticket
+        86bcqr38m / 86bcqm58n, FastOpenData board).
+        """
+        self._inner.cycle_connection()
+
     def _record(self, op: str, elapsed_ms: float, span: Any = None) -> None:
         """Record timing for an operation and annotate the OTel span."""
         self.operation_timings.setdefault(op, []).append(elapsed_ms)
