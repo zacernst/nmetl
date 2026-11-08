@@ -13163,6 +13163,24 @@ registry and silently disable every consumer of it.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pycypher.backend_engine.InstrumentedBackend.cycle_connection">
+<span class="sig-name descname"><span class="pre">cycle_connection</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/backend_engine.html#InstrumentedBackend.cycle_connection"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.backend_engine.InstrumentedBackend.cycle_connection" title="Link to this definition"></a></dt>
+<dd><p>Proxy the inner backend’s connection-cycling primitive, if any.</p>
+<p>Same rationale as <a class="reference internal" href="#pycypher.backend_engine.InstrumentedBackend.connection" title="pycypher.backend_engine.InstrumentedBackend.connection"><code class="xref py py-attr docutils literal notranslate"><span class="pre">connection</span></code></a> and <a class="reference internal" href="#pycypher.backend_engine.InstrumentedBackend.tables" title="pycypher.backend_engine.InstrumentedBackend.tables"><code class="xref py py-attr docutils literal notranslate"><span class="pre">tables</span></code></a> – this is
+a DuckDB-specific extension (<a class="reference internal" href="#pycypher.backend_engine.DuckDBBackend.cycle_connection" title="pycypher.backend_engine.DuckDBBackend.cycle_connection"><code class="xref py py-meth docutils literal notranslate"><span class="pre">DuckDBBackend.cycle_connection()</span></code></a>),
+not part of the <code class="docutils literal notranslate"><span class="pre">BackendEngine</span></code> protocol, so it is not covered by
+any generic delegation. Without this, <code class="docutils literal notranslate"><span class="pre">nmetl</span> <span class="pre">run</span> <span class="pre">-v</span></code> (which wraps
+every backend in <a class="reference internal" href="#pycypher.backend_engine.InstrumentedBackend" title="pycypher.backend_engine.InstrumentedBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">InstrumentedBackend</span></code></a>, see
+<a class="reference internal" href="#pycypher.backend_engine.select_backend" title="pycypher.backend_engine.select_backend"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_backend()</span></code></a>) combined with
+<code class="docutils literal notranslate"><span class="pre">PYCYPHER_DUCKDB_CYCLE_EVERY</span></code> raises <code class="docutils literal notranslate"><span class="pre">AttributeError</span></code> the first
+time a streaming run tries to cycle the connection – found running
+the real national pipeline with both flags set together (ticket
+86bcqr38m / 86bcqm58n, FastOpenData board).</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pycypher.backend_engine.InstrumentedBackend.timing_summary">
 <span class="sig-name descname"><span class="pre">timing_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/backend_engine.html#InstrumentedBackend.timing_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.backend_engine.InstrumentedBackend.timing_summary" title="Link to this definition"></a></dt>
 <dd><p>Return a summary of per-operation timing statistics.</p>
