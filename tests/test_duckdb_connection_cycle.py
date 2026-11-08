@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from pycypher.backend_engine import InstrumentedBackend
 from pycypher.backends.duckdb_backend import (
     DuckDBBackend,
     create_scratch_database_path,
@@ -106,6 +107,38 @@ class TestCycleConnectionOnAFileBackedBackend:
         assert backend.tables.get("Person").relation.fetchdf()[
             "name"
         ].tolist() == ["a"]
+
+
+class TestCycleConnectionThroughInstrumentedBackend:
+    """``nmetl run -v`` wraps every backend in ``InstrumentedBackend``
+    (``select_backend(..., instrument=True)``); cycling must survive that
+    wrapper too, not just the raw ``DuckDBBackend``. Found running the real
+    national pipeline with both ``-v`` and ``PYCYPHER_DUCKDB_CYCLE_EVERY``
+    set: ``InstrumentedBackend`` forwarded ``connection``/``tables`` but not
+    ``cycle_connection``, so the first cycle raised ``AttributeError``.
+    """
+
+    @pytest.fixture
+    def backend(self):
+        path = create_scratch_database_path()
+        inner = DuckDBBackend(database_path=path, own_database_file=True)
+        try:
+            yield InstrumentedBackend(inner)
+        finally:
+            inner.close()
+
+    def test_cycle_connection_is_available(self, backend):
+        backend.cycle_connection()
+
+    def test_registered_entity_table_survives_with_its_data(self, backend):
+        backend.tables.register_source_object(
+            "Person",
+            pd.DataFrame({"pid": [1, 2, 3], "name": ["a", "b", "c"]}),
+            id_col="pid",
+        )
+        backend.cycle_connection()
+        entry = backend.tables.get("Person")
+        assert entry.relation.fetchdf()["name"].tolist() == ["a", "b", "c"]
 
 
 class TestRebindDirectly:
