@@ -56,6 +56,28 @@ def _cycle_every() -> int | None:
     return n if n > 0 else None
 
 
+def _log_cycle_memory(context: Any) -> None:
+    """Log DuckDB's own tracked memory usage right after a connection cycle.
+
+    Diagnostic for board 86bcqr38m: process RSS keeps climbing across a
+    streaming run even with cycling on, and it isn't yet known whether
+    DuckDB's own accounting resets each cycle (pointing at something
+    outside DuckDB — e.g. Python/pyarrow buffers not being released) or
+    keeps climbing too (pointing at the cycle itself not reclaiming what
+    it should). ``PRAGMA database_size`` reports the connection's current
+    total, independent of process RSS.
+    """
+    from shared.logger import LOGGER
+
+    row = context.backend.connection.execute("PRAGMA database_size").fetchone()
+    memory_usage, memory_limit = row[7], row[8]
+    LOGGER.info(
+        "Cycled DuckDB connection; memory_usage=%s memory_limit=%s",
+        memory_usage,
+        memory_limit,
+    )
+
+
 def _load_query_text(source: str, config_dir: Path) -> str:
     """Load Cypher query text from a URI or relative path.
 
@@ -689,6 +711,8 @@ def _try_streaming_run(
                 if cycle_every and sources_since_cycle >= cycle_every:
                     cycle_streaming_connection(context)
                     sources_since_cycle = 0
+                    if verbose:
+                        _log_cycle_memory(context)
 
             for rel_src in pipeline_config.sources.relationships:
                 rel_ds = data_source_from_uri(
@@ -711,6 +735,8 @@ def _try_streaming_run(
                 if cycle_every and sources_since_cycle >= cycle_every:
                     cycle_streaming_connection(context)
                     sources_since_cycle = 0
+                    if verbose:
+                        _log_cycle_memory(context)
 
         except Exception as exc:  # noqa: BLE001 — any registration failure is fatal: there is no in-memory fallback once streaming is requested
             raise click.ClickException(
