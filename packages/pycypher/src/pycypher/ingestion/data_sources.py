@@ -32,6 +32,7 @@ Supported URI schemes
 
 from __future__ import annotations
 
+import hashlib
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -494,6 +495,50 @@ class DataSource(ABC):
         return DuckDBLazyFrame(con.sql(f'SELECT * FROM "{name}"'), con)  # nosec B608 — name is a UUID-based internal identifier, not user input
 
 
+#: Prefix for :func:`_cached_raw_scan`'s materialised tables — distinct from
+#: ``TableRegistry``'s ``_streaming_source_``/``_rel_source_`` prefixes so
+#: the two caches can never collide on a name.
+_RAW_SCAN_PREFIX = "_raw_scan_"
+
+
+def _cached_raw_scan(con: Any, format_sql: str) -> str:
+    """Materialise *format_sql* at most once per *con*; return the table name.
+
+    A pipeline config can declare the same physical file under several
+    source ids (e.g. a crosswalk file read once to populate a node type and
+    again to populate the relationship built from those same rows) — each
+    declaration would otherwise force its own independent full disk scan of
+    identical bytes (measured: 86bcqm594, ~4 minutes for two redundant reads
+    of a 958MB/36.7M-row parquet file). Keying the cache on *format_sql*
+    itself (the raw, pre-schema_hints, pre-query read) rather than on the
+    declaring source lets every source reading the same bytes the same way
+    reuse one materialised table instead.
+
+    The cache table is a plain entry in *con*'s catalog, so it lives in the
+    file-backed scratch database like any other registered table and
+    survives :meth:`DuckDBBackend.cycle_connection`'s connection swap the
+    same way.
+
+    Args:
+        con: A persistent ``duckdb.DuckDBPyConnection``.
+        format_sql: The raw-read SQL (e.g. ``"SELECT * FROM
+            read_parquet('…')"``) that would scan the file directly, with
+            no schema_hints casts or query applied yet.
+
+    Returns:
+        The name of a table on *con* equivalent to running *format_sql*.
+
+    """
+    name = _RAW_SCAN_PREFIX + hashlib.sha256(
+        format_sql.encode(),
+    ).hexdigest()[:24]
+    try:
+        con.table(name)
+    except Exception:  # noqa: BLE001 — duckdb raises its own CatalogException; any failure here just means "not cached yet"
+        con.execute(f'CREATE TABLE "{name}" AS {format_sql}')  # nosec B608 — name is a deterministic hash, not user input; format_sql is the caller's own already-escaped raw-read SQL
+    return name
+
+
 # ---------------------------------------------------------------------------
 # File-backed source (format-as-strategy)
 # ---------------------------------------------------------------------------
@@ -659,7 +704,9 @@ class FileDataSource(DataSource):
 
         path = _uri_to_duckdb_path(self._uri)
         # SECURITY: path escaped by view_sql via escape_sql_string_literal.
-        raw_select = f"SELECT * FROM {self._format.view_sql(path)}"  # nosec B608
+        format_sql = f"SELECT * FROM {self._format.view_sql(path)}"  # nosec B608
+        cached_table = _cached_raw_scan(con, format_sql)
+        raw_select = f'SELECT * FROM "{cached_table}"'  # nosec B608 — cached_table is a deterministic hash, not user input
 
         replace_clause = None
         if self._schema_hints:
