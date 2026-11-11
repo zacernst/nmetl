@@ -1241,6 +1241,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
@@ -1736,6 +1737,50 @@
 
 
 
+<span class="c1">#: Prefix for :func:`_cached_raw_scan`'s materialised tables — distinct from</span>
+<span class="c1">#: ``TableRegistry``'s ``_streaming_source_``/``_rel_source_`` prefixes so</span>
+<span class="c1">#: the two caches can never collide on a name.</span>
+<span class="n">_RAW_SCAN_PREFIX</span> <span class="o">=</span> <span class="s2">"_raw_scan_"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cached_raw_scan</span><span class="p">(</span><span class="n">con</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">format_sql</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Materialise *format_sql* at most once per *con*; return the table name.</span>
+
+<span class="sd">    A pipeline config can declare the same physical file under several</span>
+<span class="sd">    source ids (e.g. a crosswalk file read once to populate a node type and</span>
+<span class="sd">    again to populate the relationship built from those same rows) — each</span>
+<span class="sd">    declaration would otherwise force its own independent full disk scan of</span>
+<span class="sd">    identical bytes (measured: 86bcqm594, ~4 minutes for two redundant reads</span>
+<span class="sd">    of a 958MB/36.7M-row parquet file). Keying the cache on *format_sql*</span>
+<span class="sd">    itself (the raw, pre-schema_hints, pre-query read) rather than on the</span>
+<span class="sd">    declaring source lets every source reading the same bytes the same way</span>
+<span class="sd">    reuse one materialised table instead.</span>
+
+<span class="sd">    The cache table is a plain entry in *con*'s catalog, so it lives in the</span>
+<span class="sd">    file-backed scratch database like any other registered table and</span>
+<span class="sd">    survives :meth:`DuckDBBackend.cycle_connection`'s connection swap the</span>
+<span class="sd">    same way.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        con: A persistent ``duckdb.DuckDBPyConnection``.</span>
+<span class="sd">        format_sql: The raw-read SQL (e.g. ``"SELECT * FROM</span>
+<span class="sd">            read_parquet('…')"``) that would scan the file directly, with</span>
+<span class="sd">            no schema_hints casts or query applied yet.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The name of a table on *con* equivalent to running *format_sql*.</span>
+
+<span class="sd">    """</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">_RAW_SCAN_PREFIX</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span>
+        <span class="n">format_sql</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">24</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">table</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 — duckdb raises its own CatalogException; any failure here just means "not cached yet"</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s1">'CREATE TABLE "</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">" AS </span><span class="si">{</span><span class="n">format_sql</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>  <span class="c1"># nosec B608 — name is a deterministic hash, not user input; format_sql is the caller's own already-escaped raw-read SQL</span>
+    <span class="k">return</span> <span class="n">name</span>
+
+
 <span class="c1"># ---------------------------------------------------------------------------</span>
 <span class="c1"># File-backed source (format-as-strategy)</span>
 <span class="c1"># ---------------------------------------------------------------------------</span>
@@ -1911,7 +1956,9 @@
 
         <span class="n">path</span> <span class="o">=</span> <span class="n">_uri_to_duckdb_path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_uri</span><span class="p">)</span>
         <span class="c1"># SECURITY: path escaped by view_sql via escape_sql_string_literal.</span>
-        <span class="n">raw_select</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"SELECT * FROM </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">view_sql</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># nosec B608</span>
+        <span class="n">format_sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"SELECT * FROM </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">view_sql</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># nosec B608</span>
+        <span class="n">cached_table</span> <span class="o">=</span> <span class="n">_cached_raw_scan</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">format_sql</span><span class="p">)</span>
+        <span class="n">raw_select</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">'SELECT * FROM "</span><span class="si">{</span><span class="n">cached_table</span><span class="si">}</span><span class="s1">"'</span>  <span class="c1"># nosec B608 — cached_table is a deterministic hash, not user input</span>
 
         <span class="n">replace_clause</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema_hints</span><span class="p">:</span>
