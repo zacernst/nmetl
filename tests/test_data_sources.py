@@ -284,8 +284,7 @@ def _mock_duckdb_connect(preset_table: pa.Table) -> MagicMock:
     mock_con.__enter__ = MagicMock(return_value=mock_con)
     mock_con.__exit__ = MagicMock(return_value=False)
 
-    mock_connect = MagicMock(return_value=mock_con)
-    return mock_connect
+    return MagicMock(return_value=mock_con)
 
 
 _PRESET_TABLE = pa.table({"id": [1, 2], "name": ["Alice", "Bob"]})
@@ -419,7 +418,7 @@ class TestRemoteSourceMocking:
 
 
 # ===========================================================================
-# TestFileDataSourceFixtures — exhaustive format × URI-scheme integration
+# TestFileDataSourceFixtures — exhaustive format x URI-scheme integration
 # ===========================================================================
 
 
@@ -728,7 +727,9 @@ class TestDataSourceFromUri:
             data_source_from_uri("/data/file.xlsx")
 
     def test_bad_type_raises(self) -> None:
-        with pytest.raises(TypeError, match="str, pd.DataFrame, or pa.Table"):
+        with pytest.raises(
+            TypeError, match=r"str, pd\.DataFrame, or pa\.Table"
+        ):
             data_source_from_uri(42)  # type: ignore[arg-type]
 
     def test_no_extension_raises(self) -> None:
@@ -836,9 +837,11 @@ class TestDuckDBConnectionCleanup:
         mock_con.__exit__ = MagicMock(return_value=False)
         mock_con.execute.side_effect = RuntimeError("boom")
 
-        with patch("duckdb.connect", return_value=mock_con):
-            with pytest.raises(RuntimeError):
-                src.read()
+        with (
+            patch("duckdb.connect", return_value=mock_con),
+            pytest.raises(RuntimeError),
+        ):
+            src.read()
 
         # __exit__ must still be called (cleanup on exception)
         mock_con.__exit__.assert_called_once()
