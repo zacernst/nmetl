@@ -16,12 +16,16 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pyarrow as pa
 import pytest
+from pycypher.backends.duckdb_backend import create_duckdb_connection
 from pycypher.ingestion.data_sources import (
+    _RAW_SCAN_PREFIX,
     ArrowDataSource,
     CsvFormat,
     DataFrameDataSource,
@@ -31,6 +35,7 @@ from pycypher.ingestion.data_sources import (
     JsonFormat,
     ParquetFormat,
     SqlDataSource,
+    compute_repeated_file_format_sqls,
     data_source_from_uri,
 )
 
@@ -279,8 +284,7 @@ def _mock_duckdb_connect(preset_table: pa.Table) -> MagicMock:
     mock_con.__enter__ = MagicMock(return_value=mock_con)
     mock_con.__exit__ = MagicMock(return_value=False)
 
-    mock_connect = MagicMock(return_value=mock_con)
-    return mock_connect
+    return MagicMock(return_value=mock_con)
 
 
 _PRESET_TABLE = pa.table({"id": [1, 2], "name": ["Alice", "Bob"]})
@@ -414,7 +418,7 @@ class TestRemoteSourceMocking:
 
 
 # ===========================================================================
-# TestFileDataSourceFixtures — exhaustive format × URI-scheme integration
+# TestFileDataSourceFixtures — exhaustive format x URI-scheme integration
 # ===========================================================================
 
 
@@ -723,7 +727,9 @@ class TestDataSourceFromUri:
             data_source_from_uri("/data/file.xlsx")
 
     def test_bad_type_raises(self) -> None:
-        with pytest.raises(TypeError, match="str, pd.DataFrame, or pa.Table"):
+        with pytest.raises(
+            TypeError, match=r"str, pd\.DataFrame, or pa\.Table"
+        ):
             data_source_from_uri(42)  # type: ignore[arg-type]
 
     def test_no_extension_raises(self) -> None:
@@ -831,9 +837,135 @@ class TestDuckDBConnectionCleanup:
         mock_con.__exit__ = MagicMock(return_value=False)
         mock_con.execute.side_effect = RuntimeError("boom")
 
-        with patch("duckdb.connect", return_value=mock_con):
-            with pytest.raises(RuntimeError):
-                src.read()
+        with (
+            patch("duckdb.connect", return_value=mock_con),
+            pytest.raises(RuntimeError),
+        ):
+            src.read()
 
         # __exit__ must still be called (cleanup on exception)
         mock_con.__exit__.assert_called_once()
+
+
+# ===========================================================================
+# TestScopedRawScanCache — 86bd3qemd/86bd3qemv/86bd3qemw
+#
+# _cached_raw_scan must only materialise a permanent table for a source
+# genuinely declared more than once in a pipeline config; a source declared
+# exactly once must get a direct, lazy read with no table left behind.
+# ===========================================================================
+
+
+def _raw_scan_table_names(con: Any) -> set[str]:
+    """Names of every ``_raw_scan_*`` table currently in *con*'s catalog."""
+    rows = con.execute(
+        "SELECT table_name FROM duckdb_tables() WHERE table_name LIKE ?",
+        [f"{_RAW_SCAN_PREFIX}%"],
+    ).fetchall()
+    return {row[0] for row in rows}
+
+
+def _fake_pipeline_config(
+    *,
+    entities: list[Any] | None = None,
+    relationships: list[Any] | None = None,
+) -> SimpleNamespace:
+    """A minimal stand-in exposing the attributes compute_repeated_file_format_sqls reads."""
+    return SimpleNamespace(
+        sources=SimpleNamespace(
+            entities=entities or [],
+            relationships=relationships or [],
+        ),
+    )
+
+
+def _fake_source_spec(
+    uri: str,
+    *,
+    query: str | None = None,
+    schema_hints: dict[str, str] | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(uri=uri, query=query, schema_hints=schema_hints)
+
+
+class TestComputeRepeatedFileFormatSqls:
+    def test_single_use_source_yields_empty_set(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        p = _make_csv(tmp_path, _SAMPLE_DATA)
+        config = _fake_pipeline_config(
+            entities=[_fake_source_spec(str(p))],
+        )
+        assert compute_repeated_file_format_sqls(config) == frozenset()
+
+    def test_source_declared_twice_is_detected(self, tmp_path: Path) -> None:
+        p = _make_csv(tmp_path, _SAMPLE_DATA)
+        config = _fake_pipeline_config(
+            entities=[_fake_source_spec(str(p))],
+            relationships=[_fake_source_spec(str(p))],
+        )
+        repeated = compute_repeated_file_format_sqls(config)
+        expected = FileDataSource(str(p), CsvFormat()).raw_format_sql()
+        assert repeated == frozenset({expected})
+
+    def test_different_schema_hints_do_not_count_as_repeated(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Two declarations of the *same raw bytes* with different
+        schema_hints/query still share one format_sql (hints/query apply
+        after the raw scan) — this asserts the detection keys on the raw
+        read, not on the full source spec.
+        """
+        p = _make_csv(tmp_path, _SAMPLE_DATA)
+        config = _fake_pipeline_config(
+            entities=[
+                _fake_source_spec(str(p), schema_hints={"id": "BIGINT"}),
+            ],
+            relationships=[
+                _fake_source_spec(str(p), query="SELECT * FROM source")
+            ],
+        )
+        assert len(compute_repeated_file_format_sqls(config)) == 1
+
+
+class TestScopedCachedRawScan:
+    def test_single_use_source_leaves_no_raw_scan_table(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        p = _make_csv(tmp_path, _SAMPLE_DATA)
+        con = create_duckdb_connection()
+        try:
+            src = FileDataSource(str(p), CsvFormat())
+            # No mark_repeated_format_sqls() call: default is "not repeated".
+            src.read_relation(con)
+            assert _raw_scan_table_names(con) == set()
+        finally:
+            con.close()
+
+    def test_repeated_source_shares_exactly_one_raw_scan_table(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        p = _make_csv(tmp_path, _SAMPLE_DATA)
+        con = create_duckdb_connection()
+        try:
+            src_a = FileDataSource(str(p), CsvFormat())
+            src_b = FileDataSource(str(p), CsvFormat())
+            repeated = frozenset({src_a.raw_format_sql()})
+            src_a.mark_repeated_format_sqls(repeated)
+            src_b.mark_repeated_format_sqls(repeated)
+
+            lazy_a = src_a.read_relation(con)
+            lazy_b = src_b.read_relation(con)
+
+            raw_scan_tables = _raw_scan_table_names(con)
+            assert len(raw_scan_tables) == 1
+
+            rows_a = sorted(lazy_a.relation.fetchall())
+            rows_b = sorted(lazy_b.relation.fetchall())
+            assert rows_a == rows_b
+        finally:
+            con.close()
