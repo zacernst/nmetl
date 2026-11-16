@@ -645,7 +645,11 @@ def _try_streaming_run(
         sweep_orphaned_scratch_databases,
     )
     from pycypher.ingestion.context_builder import ContextBuilder
-    from pycypher.ingestion.data_sources import data_source_from_uri
+    from pycypher.ingestion.data_sources import (
+        FileDataSource,
+        compute_repeated_file_format_sqls,
+        data_source_from_uri,
+    )
     from pycypher.relation_engine import (
         bridge_user_functions,
         cycle_streaming_connection,
@@ -694,6 +698,14 @@ def _try_streaming_run(
         stream_errors = _QUERY_EXEC_ERRORS + _OUTPUT_ERRORS
         cycle_every = _cycle_every()
         sources_since_cycle = 0
+        # Precomputed once, up front: _cached_raw_scan's permanent cache
+        # table is only worth its cost for a source whose raw read is
+        # genuinely declared more than once in this config (86bd3qemd) —
+        # everything else gets a direct, lazy read with no table left
+        # behind in the catalog.
+        repeated_format_sqls = compute_repeated_file_format_sqls(
+            pipeline_config,
+        )
         try:
             for entity_src in pipeline_config.sources.entities:
                 ds = data_source_from_uri(
@@ -701,6 +713,8 @@ def _try_streaming_run(
                     query=entity_src.query,
                     schema_hints=entity_src.schema_hints,
                 )
+                if isinstance(ds, FileDataSource):
+                    ds.mark_repeated_format_sqls(repeated_format_sqls)
                 register_streaming_source(
                     context,
                     entity_src.entity_type,
@@ -720,6 +734,8 @@ def _try_streaming_run(
                     query=rel_src.query,
                     schema_hints=rel_src.schema_hints,
                 )
+                if isinstance(rel_ds, FileDataSource):
+                    rel_ds.mark_repeated_format_sqls(repeated_format_sqls)
                 register_streaming_relationship(
                     context,
                     rel_src.relationship_type,

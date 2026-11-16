@@ -35,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import re
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -529,14 +530,61 @@ def _cached_raw_scan(con: Any, format_sql: str) -> str:
         The name of a table on *con* equivalent to running *format_sql*.
 
     """
-    name = _RAW_SCAN_PREFIX + hashlib.sha256(
-        format_sql.encode(),
-    ).hexdigest()[:24]
+    name = (
+        _RAW_SCAN_PREFIX
+        + hashlib.sha256(
+            format_sql.encode(),
+        ).hexdigest()[:24]
+    )
     try:
         con.table(name)
     except Exception:  # noqa: BLE001 — duckdb raises its own CatalogException; any failure here just means "not cached yet"
         con.execute(f'CREATE TABLE "{name}" AS {format_sql}')  # nosec B608 — name is a deterministic hash, not user input; format_sql is the caller's own already-escaped raw-read SQL
     return name
+
+
+def compute_repeated_file_format_sqls(pipeline_config: Any) -> frozenset[str]:
+    """Raw-read SQL strings declared by 2+ sources in *pipeline_config*.
+
+    :func:`_cached_raw_scan` must only materialise a permanent table for a
+    source that's genuinely read more than once (e.g. a crosswalk file read
+    once to populate a node type and again to populate the relationship
+    built from those same rows, 86bcqm594) — caching every file-backed
+    source unconditionally instead left one full-size table behind in the
+    catalog per source for the life of the run, with no reuse benefit for
+    the overwhelming majority of sources (the national pipeline config
+    declares ~40, nearly all single-use) (86bd3qemd).
+
+    Walks *pipeline_config*'s declared sources, computes each file-backed
+    one's raw format_sql the same way :meth:`FileDataSource.read_relation`
+    does, and returns only the strings shared by 2 or more of them — the
+    sources :meth:`FileDataSource.read_relation` should route through
+    :func:`_cached_raw_scan`. Every other source keeps the direct, lazy
+    read with no permanent table left behind.
+
+    Args:
+        pipeline_config: The loaded pipeline config. Only
+            ``sources.entities`` and ``sources.relationships`` are read,
+            each item expected to expose ``uri``, ``query``, and
+            ``schema_hints`` attributes.
+
+    Returns:
+        The set of raw format_sql strings shared by 2+ declared sources.
+
+    """
+    counts: Counter[str] = Counter()
+    for src in (
+        *pipeline_config.sources.entities,
+        *pipeline_config.sources.relationships,
+    ):
+        ds = data_source_from_uri(
+            src.uri,
+            query=src.query,
+            schema_hints=src.schema_hints,
+        )
+        if isinstance(ds, FileDataSource):
+            counts[ds.raw_format_sql()] += 1
+    return frozenset(sql for sql, n in counts.items() if n >= 2)
 
 
 # ---------------------------------------------------------------------------
@@ -580,6 +628,7 @@ class FileDataSource(DataSource):
         self._format = format
         self._query = query
         self._schema_hints = schema_hints
+        self._repeated_format_sqls: frozenset[str] = frozenset()
 
     @property
     def uri(self) -> str:
@@ -669,6 +718,27 @@ class FileDataSource(DataSource):
             sql = self._query or "SELECT * FROM source"
             return con.execute(sql).to_arrow_table()
 
+    def raw_format_sql(self) -> str:
+        """The raw (pre-schema_hints, pre-query) read SQL for this source.
+
+        Exposed so :func:`compute_repeated_file_format_sqls` can precompute,
+        for every declared source, the exact string :meth:`read_relation`
+        would hash via :func:`_cached_raw_scan` — without needing a
+        connection or touching the file itself.
+        """
+        path = _uri_to_duckdb_path(self._uri)
+        return f"SELECT * FROM {self._format.view_sql(path)}"  # nosec B608 — path escaped by view_sql via escape_sql_string_literal
+
+    def mark_repeated_format_sqls(self, repeated: frozenset[str]) -> None:
+        """Tell this source which raw-read SQL strings repeat elsewhere.
+
+        Call before :meth:`read_relation` so it knows whether its own raw
+        read is genuinely shared with another declared source (and
+        therefore worth :func:`_cached_raw_scan`'s materialisation cost) —
+        see :func:`compute_repeated_file_format_sqls`.
+        """
+        self._repeated_format_sqls = repeated
+
     def read_relation(self, con: Any) -> Any:
         """Scan the file directly via DuckDB, returning a lazy relation.
 
@@ -702,11 +772,17 @@ class FileDataSource(DataSource):
             msg = f"Security validation failed for file data source: {e}"
             raise SecurityError(msg) from e
 
-        path = _uri_to_duckdb_path(self._uri)
-        # SECURITY: path escaped by view_sql via escape_sql_string_literal.
-        format_sql = f"SELECT * FROM {self._format.view_sql(path)}"  # nosec B608
-        cached_table = _cached_raw_scan(con, format_sql)
-        raw_select = f'SELECT * FROM "{cached_table}"'  # nosec B608 — cached_table is a deterministic hash, not user input
+        format_sql = self.raw_format_sql()
+        if format_sql in self._repeated_format_sqls:
+            cached_table = _cached_raw_scan(con, format_sql)
+            raw_select = f'SELECT * FROM "{cached_table}"'  # nosec B608 — cached_table is a deterministic hash, not user input
+        else:
+            # Declared exactly once in this run's pipeline config — a lazy
+            # view costs nothing extra and leaves no permanent table behind
+            # (86bd3qemd: unconditionally caching every source left one
+            # full-size table per single-use source sitting in the catalog
+            # for the life of the run).
+            raw_select = format_sql  # nosec B608 — path escaped by view_sql via escape_sql_string_literal
 
         replace_clause = None
         if self._schema_hints:
