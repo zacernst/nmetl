@@ -20519,6 +20519,40 @@ The caller owns its lifecycle.</p>
 
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="pycypher.ingestion.data_sources.compute_repeated_file_format_sqls">
+<span class="sig-prename descclassname"><span class="pre">pycypher.ingestion.data_sources.</span></span><span class="sig-name descname"><span class="pre">compute_repeated_file_format_sqls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pipeline_config</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/ingestion/data_sources.html#compute_repeated_file_format_sqls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.ingestion.data_sources.compute_repeated_file_format_sqls" title="Link to this definition"></a></dt>
+<dd><p>Raw-read SQL strings declared by 2+ sources in <em>pipeline_config</em>.</p>
+<p><code class="xref py py-func docutils literal notranslate"><span class="pre">_cached_raw_scan()</span></code> must only materialise a permanent table for a
+source that’s genuinely read more than once (e.g. a crosswalk file read
+once to populate a node type and again to populate the relationship
+built from those same rows, 86bcqm594) — caching every file-backed
+source unconditionally instead left one full-size table behind in the
+catalog per source for the life of the run, with no reuse benefit for
+the overwhelming majority of sources (the national pipeline config
+declares ~40, nearly all single-use) (86bd3qemd).</p>
+<p>Walks <em>pipeline_config</em>’s declared sources, computes each file-backed
+one’s raw format_sql the same way <a class="reference internal" href="#pycypher.ingestion.data_sources.FileDataSource.read_relation" title="pycypher.ingestion.data_sources.FileDataSource.read_relation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FileDataSource.read_relation()</span></code></a>
+does, and returns only the strings shared by 2 or more of them — the
+sources <a class="reference internal" href="#pycypher.ingestion.data_sources.FileDataSource.read_relation" title="pycypher.ingestion.data_sources.FileDataSource.read_relation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FileDataSource.read_relation()</span></code></a> should route through
+<code class="xref py py-func docutils literal notranslate"><span class="pre">_cached_raw_scan()</span></code>. Every other source keeps the direct, lazy
+read with no permanent table left behind.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pipeline_config</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.15)"><em>Any</em></a>) – The loaded pipeline config. Only
+<code class="docutils literal notranslate"><span class="pre">sources.entities</span></code> and <code class="docutils literal notranslate"><span class="pre">sources.relationships</span></code> are read,
+each item expected to expose <code class="docutils literal notranslate"><span class="pre">uri</span></code>, <code class="docutils literal notranslate"><span class="pre">query</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">schema_hints</span></code> attributes.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The set of raw format_sql strings shared by 2+ declared sources.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#frozenset" title="(in Python v3.15)">frozenset</a>[<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py class">
 <dt class="sig sig-object py" id="pycypher.ingestion.data_sources.FileDataSource">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pycypher.ingestion.data_sources.</span></span><span class="sig-name descname"><span class="pre">FileDataSource</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">uri</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schema_hints</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/ingestion/data_sources.html#FileDataSource"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.ingestion.data_sources.FileDataSource" title="Link to this definition"></a></dt>
@@ -20591,6 +20625,30 @@ hinted types (e.g. comparing a hinted-INTEGER column with
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><em>Table</em></p>
 </dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycypher.ingestion.data_sources.FileDataSource.raw_format_sql">
+<span class="sig-name descname"><span class="pre">raw_format_sql</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/ingestion/data_sources.html#FileDataSource.raw_format_sql"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.ingestion.data_sources.FileDataSource.raw_format_sql" title="Link to this definition"></a></dt>
+<dd><p>The raw (pre-schema_hints, pre-query) read SQL for this source.</p>
+<p>Exposed so <a class="reference internal" href="#pycypher.ingestion.data_sources.compute_repeated_file_format_sqls" title="pycypher.ingestion.data_sources.compute_repeated_file_format_sqls"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_repeated_file_format_sqls()</span></code></a> can precompute,
+for every declared source, the exact string <a class="reference internal" href="#pycypher.ingestion.data_sources.FileDataSource.read_relation" title="pycypher.ingestion.data_sources.FileDataSource.read_relation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">read_relation()</span></code></a>
+would hash via <code class="xref py py-func docutils literal notranslate"><span class="pre">_cached_raw_scan()</span></code> — without needing a
+connection or touching the file itself.</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pycypher.ingestion.data_sources.FileDataSource.mark_repeated_format_sqls">
+<span class="sig-name descname"><span class="pre">mark_repeated_format_sqls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">repeated</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pycypher/ingestion/data_sources.html#FileDataSource.mark_repeated_format_sqls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pycypher.ingestion.data_sources.FileDataSource.mark_repeated_format_sqls" title="Link to this definition"></a></dt>
+<dd><p>Tell this source which raw-read SQL strings repeat elsewhere.</p>
+<p>Call before <a class="reference internal" href="#pycypher.ingestion.data_sources.FileDataSource.read_relation" title="pycypher.ingestion.data_sources.FileDataSource.read_relation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">read_relation()</span></code></a> so it knows whether its own raw
+read is genuinely shared with another declared source (and
+therefore worth <code class="xref py py-func docutils literal notranslate"><span class="pre">_cached_raw_scan()</span></code>’s materialisation cost) —
+see <a class="reference internal" href="#pycypher.ingestion.data_sources.compute_repeated_file_format_sqls" title="pycypher.ingestion.data_sources.compute_repeated_file_format_sqls"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_repeated_file_format_sqls()</span></code></a>.</p>
+<dl class="field-list simple">
 </dl>
 </dd></dl>
 

@@ -1857,7 +1857,11 @@
         <span class="n">sweep_orphaned_scratch_databases</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pycypher.ingestion.context_builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContextBuilder</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">pycypher.ingestion.data_sources</span><span class="w"> </span><span class="kn">import</span> <span class="n">data_source_from_uri</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pycypher.ingestion.data_sources</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">FileDataSource</span><span class="p">,</span>
+        <span class="n">compute_repeated_file_format_sqls</span><span class="p">,</span>
+        <span class="n">data_source_from_uri</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pycypher.relation_engine</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">bridge_user_functions</span><span class="p">,</span>
         <span class="n">cycle_streaming_connection</span><span class="p">,</span>
@@ -1906,6 +1910,14 @@
         <span class="n">stream_errors</span> <span class="o">=</span> <span class="n">_QUERY_EXEC_ERRORS</span> <span class="o">+</span> <span class="n">_OUTPUT_ERRORS</span>
         <span class="n">cycle_every</span> <span class="o">=</span> <span class="n">_cycle_every</span><span class="p">()</span>
         <span class="n">sources_since_cycle</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># Precomputed once, up front: _cached_raw_scan's permanent cache</span>
+        <span class="c1"># table is only worth its cost for a source whose raw read is</span>
+        <span class="c1"># genuinely declared more than once in this config (86bd3qemd) —</span>
+        <span class="c1"># everything else gets a direct, lazy read with no table left</span>
+        <span class="c1"># behind in the catalog.</span>
+        <span class="n">repeated_format_sqls</span> <span class="o">=</span> <span class="n">compute_repeated_file_format_sqls</span><span class="p">(</span>
+            <span class="n">pipeline_config</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">entity_src</span> <span class="ow">in</span> <span class="n">pipeline_config</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">entities</span><span class="p">:</span>
                 <span class="n">ds</span> <span class="o">=</span> <span class="n">data_source_from_uri</span><span class="p">(</span>
@@ -1913,6 +1925,8 @@
                     <span class="n">query</span><span class="o">=</span><span class="n">entity_src</span><span class="o">.</span><span class="n">query</span><span class="p">,</span>
                     <span class="n">schema_hints</span><span class="o">=</span><span class="n">entity_src</span><span class="o">.</span><span class="n">schema_hints</span><span class="p">,</span>
                 <span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">FileDataSource</span><span class="p">):</span>
+                    <span class="n">ds</span><span class="o">.</span><span class="n">mark_repeated_format_sqls</span><span class="p">(</span><span class="n">repeated_format_sqls</span><span class="p">)</span>
                 <span class="n">register_streaming_source</span><span class="p">(</span>
                     <span class="n">context</span><span class="p">,</span>
                     <span class="n">entity_src</span><span class="o">.</span><span class="n">entity_type</span><span class="p">,</span>
@@ -1932,6 +1946,8 @@
                     <span class="n">query</span><span class="o">=</span><span class="n">rel_src</span><span class="o">.</span><span class="n">query</span><span class="p">,</span>
                     <span class="n">schema_hints</span><span class="o">=</span><span class="n">rel_src</span><span class="o">.</span><span class="n">schema_hints</span><span class="p">,</span>
                 <span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rel_ds</span><span class="p">,</span> <span class="n">FileDataSource</span><span class="p">):</span>
+                    <span class="n">rel_ds</span><span class="o">.</span><span class="n">mark_repeated_format_sqls</span><span class="p">(</span><span class="n">repeated_format_sqls</span><span class="p">)</span>
                 <span class="n">register_streaming_relationship</span><span class="p">(</span>
                     <span class="n">context</span><span class="p">,</span>
                     <span class="n">rel_src</span><span class="o">.</span><span class="n">relationship_type</span><span class="p">,</span>
